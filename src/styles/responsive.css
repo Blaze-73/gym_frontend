@@ -1,0 +1,226 @@
+/* Custom responsive fixes for Gym Management App */
+/* Neon green theme with dark background - futuristic/cyber style */
+
+:root {
+  --color-primary-neon: #00ff9d;
+  --color-primary-neon-hover: #00e68a;
+  --color-dark-bg: #0a0a0a;
+  --color-card-bg: #111111;
+  --color-border-glow: rgba(0, 255, 157, 0.2);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #cccccc;
+  --color-error: #ff4d4d;
+  --color-warning: #ffc107;
+  --color-success: #4caf50;
+}
+
+/* Mobile-first base styles */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--color-dark-bg);
+  color: var(--color-text-primary);
+  overflow-x: hidden;
+}
+
+/* Prevent layout shift during loading */
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Smooth scrolling for all elements */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent FOUC - Flash of Unstyled Content */
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Neon glow effect - optimized for performance */
+.neon-glow {
+  box-shadow: 0 0 8px rgba(0, 255, 157, 0.3);
+}
+
+/* Card with hover effect - GPU accelerated */
+.card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  will-change: transform;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 255, 157, 0.1);
+}
+
+/* Touch-friendly buttons */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Loading spinner - optimized animation */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(0, 255, 157, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--color-primary-neon);
+  animation: spin 1s ease-in-out infinite;
+}
+
+/* Mobile navigation overlay */
+.mobile-nav-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 40;
+}
+
+/* Responsive table container */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive spacing utilities */
+.section-spacing {
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .section-spacing {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .section-spacing {
+    padding: 2rem;
+  }
+}
+
+/* Text truncation with ellipsis */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hide scrollbar but keep functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Optimized animations using transform/opacity for better performance */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Utility classes for responsive visibility */
+@media (max-width: 320px) {
+  body {
+    font-size: 14px;
+  }
+}
+
+/* Desktop-specific styles */
+@media (min-width: 1024px) {
+  .desktop-only {
+    display: block;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-dark-bg: #050505;
+    --color-card-bg: #0f0f0f;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border-glow: rgba(0, 255, 157, 0.5);
+  }
+}
+
+/* Container query support for future */
+@container (min-width: 400px) {
+  .card {
+    padding: 1.5rem;
+  }
+}
