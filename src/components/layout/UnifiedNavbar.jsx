@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Dumbbell, ShoppingCart, User, ChevronDown, LogOut, Settings, Home, Package, MessageSquare } from 'lucide-react';
+import { Menu, X, ShoppingCart, ChevronDown, LogOut, Settings, Home, Package } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import Logo from '@/components/common/Logo';
 
-// ✅ Simplified: this navbar is ONLY used inside PublicLayout (unauthenticated pages).
-// Admin pages use AdminLayout's own header.
-// Client pages use ClientSidebar's own mobile header.
-// Previously this component also rendered DesktopSidebar / MobileSidebar for authed users
-// which caused duplicate navbars whenever ClientLayout also included this component.
+// Used on public pages (Home, Plans, Store, etc.) for guests and logged-in users alike.
 
 const PUBLIC_NAV = [
   { name: 'Home',   href: '/',      icon: Home    },
@@ -58,40 +55,32 @@ const UnifiedNavbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
 
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-sm bg-primary-fixed shadow-[0_0_8px_#daf900]" />
-              <span className="text-xl font-black font-headline text-white tracking-widest">
-                ALIEN FITNESS
-              </span>
-            </Link>
+            <Logo to="/" size="md" className="min-w-0" />
 
-            {/* Desktop public links (shown when not logged in) */}
-            {!user && (
-              <div className="hidden md:flex items-center gap-1">
-                {PUBLIC_NAV.map((item) => (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    className={`px-4 py-2 text-sm font-headline font-bold uppercase tracking-wider rounded-lg transition-colors ${
-                      isActive(item.href)
-                        ? 'text-primary-fixed'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-            )}
+            {/* Desktop public links — always on public pages */}
+            <div className="hidden md:flex items-center gap-1">
+              {PUBLIC_NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={`px-4 py-2 text-sm font-headline font-bold uppercase tracking-wider rounded-lg transition-colors ${
+                    isActive(item.href)
+                      ? 'text-primary-fixed'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </div>
 
             {/* Right side */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 sm:gap-3">
             {/* Cart */}
             <button
               type="button"
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 text-gray-400 hover:text-white transition-colors"
+              className="relative p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
               aria-label="Open cart drawer"
             >
               <ShoppingCart className="w-5 h-5" />
@@ -109,7 +98,7 @@ const UnifiedNavbar = () => {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-full hover:bg-white/5 transition-colors"
                   >
                     <div className="w-7 h-7 rounded-full bg-primary-fixed/20 border border-primary-fixed/40
                                     flex items-center justify-center">
@@ -170,8 +159,8 @@ const UnifiedNavbar = () => {
                   </Link>
                   <Link
                     to="/register"
-                    className="px-5 py-2 bg-primary-fixed text-on-primary-fixed rounded-full
-                               text-sm font-headline font-bold uppercase tracking-wider
+                    className="px-3 sm:px-5 py-2 bg-primary-fixed text-on-primary-fixed rounded-full
+                               text-xs sm:text-sm font-headline font-bold uppercase tracking-wider
                                hover:scale-105 transition-transform shadow-[0_0_12px_#daf90050]"
                   >
                     Join Now
@@ -179,23 +168,22 @@ const UnifiedNavbar = () => {
                 </>
               )}
 
-              {/* Mobile hamburger (public pages only) */}
-              {!user && (
-                <button
-                  onClick={() => setMobileOpen(!mobileOpen)}
-                  className="md:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                  aria-label="Toggle menu"
-                >
-                  {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                </button>
-              )}
+              {/* Mobile hamburger */}
+              <button
+                type="button"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="md:hidden p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Toggle menu"
+              >
+                {mobileOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile menu (public pages, not logged in) */}
+        {/* Mobile menu */}
         <AnimatePresence>
-          {mobileOpen && !user && (
+          {mobileOpen && (
             <>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -213,10 +201,7 @@ const UnifiedNavbar = () => {
                            z-50 md:hidden flex flex-col"
               >
                 <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
-                  <Link to="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-sm bg-primary-fixed" />
-                    <span className="text-lg font-black font-headline text-white tracking-widest">ALIEN</span>
-                  </Link>
+                  <Logo to="/" size="sm" onClick={() => setMobileOpen(false)} />
                   <button onClick={() => setMobileOpen(false)} className="p-2 hover:bg-white/5 rounded-lg">
                     <X className="w-5 h-5 text-gray-400" />
                   </button>
@@ -241,22 +226,37 @@ const UnifiedNavbar = () => {
                 </nav>
 
                 <div className="p-4 border-t border-white/5 space-y-3">
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileOpen(false)}
-                    className="block w-full px-4 py-3 text-center text-sm font-headline font-bold uppercase
-                               bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/register"
-                    onClick={() => setMobileOpen(false)}
-                    className="block w-full px-4 py-3 text-center text-sm font-headline font-bold uppercase
-                               bg-primary-fixed text-on-primary-fixed rounded-xl hover:scale-105 transition-transform"
-                  >
-                    Join Now
-                  </Link>
+                  {user ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setMobileOpen(false); handleLogout(); }}
+                        className="block w-full px-4 py-3 text-center text-sm font-headline font-bold uppercase
+                                   text-error bg-error/10 border border-error/20 rounded-xl"
+                      >
+                        Logout
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        onClick={() => setMobileOpen(false)}
+                        className="block w-full px-4 py-3 text-center text-sm font-headline font-bold uppercase
+                                   bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+                      >
+                        Login
+                      </Link>
+                      <Link
+                        to="/register"
+                        onClick={() => setMobileOpen(false)}
+                        className="block w-full px-4 py-3 text-center text-sm font-headline font-bold uppercase
+                                   bg-primary-fixed text-on-primary-fixed rounded-xl hover:scale-105 transition-transform"
+                      >
+                        Join Now
+                      </Link>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </>

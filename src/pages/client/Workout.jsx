@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Clock, Dumbbell, ChevronRight, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { workoutsAPI, userStatsAPI } from '@/services/api';
+import Select from '@/components/common/Select';
 
 const Workout = () => {
   const { id } = useParams(); // This is the Workout Template ID
@@ -134,10 +135,16 @@ const Workout = () => {
           <p className="text-gray-400 text-center max-w-md">Choose your training program below and let's crush your goals together!</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <select value={selectedProtocol} onChange={(e) => setSelectedProtocol(e.target.value)} className="bg-surface-container-high text-white rounded-xl px-4 py-3 min-w-[250px] border border-white/5 focus:border-primary-fixed focus:outline-none">
-            <option value="">Select Training Program</option>
-            {protocols.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <Select
+            value={selectedProtocol}
+            onChange={setSelectedProtocol}
+            placeholder="Select Training Program"
+            className="min-w-[250px]"
+            options={[
+              { value: '', label: 'Select Training Program' },
+              ...protocols.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+          />
           <button onClick={loadProtocol} disabled={!selectedProtocol} className="px-6 py-3 bg-primary-fixed text-on-primary-fixed rounded-xl font-headline font-bold uppercase tracking-wider disabled:opacity-50">Begin Workout</button>
         </div>
       </div>
@@ -156,10 +163,16 @@ const Workout = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 mr-4">
-               <select value={selectedProtocol} onChange={(e) => setSelectedProtocol(e.target.value)} className="bg-surface-container-high text-xs text-white rounded-lg px-2 py-1 border border-white/10">
-                <option value="">Switch Program</option>
-                {protocols.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+               <Select
+                value={selectedProtocol}
+                onChange={setSelectedProtocol}
+                placeholder="Switch Program"
+                className="min-w-[140px]"
+                options={[
+                  { value: '', label: 'Switch Program' },
+                  ...protocols.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+              />
               <button onClick={loadProtocol} className="p-1 bg-primary-fixed text-black rounded-lg"><ChevronRight className="w-4 h-4"/></button>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-high rounded-full">

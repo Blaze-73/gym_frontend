@@ -3,12 +3,14 @@ import { productsAPI, categoriesAPI } from '@/services/api';
 import { Plus, Edit, Trash2, Search, AlertTriangle, Package } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { resolveMediaUrl } from '@/utils/helpers';
 
 const AdminProducts = () => {
   const [products, setProducts]       = useState([]);
   const [categories, setCategories]   = useState([]);
   const [loading, setLoading]         = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [deleteConfirm, setDeleteConfirm] = useState(null); // product object | null
   const [deleting, setDeleting]       = useState(false);
   const navigate = useNavigate();
@@ -18,7 +20,7 @@ const AdminProducts = () => {
   const fetchData = async () => {
     try {
       const [productsRes, categoriesRes] = await Promise.all([
-        productsAPI.getAll(),
+        productsAPI.getAllAdmin(),
         categoriesAPI.getAll(),
       ]);
       setProducts(Array.isArray(productsRes.data)    ? productsRes.data    : []);
@@ -54,9 +56,25 @@ const AdminProducts = () => {
     return cat ? cat.name : 'Uncategorized';
   };
 
-  const filteredProducts = products.filter(p =>
-    p.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const statusCounts = {
+    all: products.length,
+    active: products.filter((p) => p.status === 'active').length,
+    inactive: products.filter((p) => p.status !== 'active').length,
+  };
+
+  const filteredProducts = products
+    .filter((p) => {
+      if (statusFilter === 'active') return p.status === 'active';
+      if (statusFilter === 'inactive') return p.status !== 'active';
+      return true;
+    })
+    .filter((p) => p.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const statusTabs = [
+    { key: 'all', label: 'All' },
+    { key: 'active', label: 'Active' },
+    { key: 'inactive', label: 'Inactive' },
+  ];
 
   if (loading) {
     return (
@@ -76,7 +94,7 @@ const AdminProducts = () => {
             PRODUCT <span className="text-primary-fixed">MANAGEMENT</span>
           </h2>
           <p className="text-on-surface-variant mt-1 text-sm">
-            {products.length} product{products.length !== 1 ? 's' : ''} · {categories.length} categories
+            {statusCounts.active} active · {statusCounts.inactive} inactive · {categories.length} categories
           </p>
         </div>
         <Link
@@ -88,6 +106,27 @@ const AdminProducts = () => {
           <Plus className="w-4 h-4" />
           Add Product
         </Link>
+      </div>
+
+      {/* ── Status filter ──────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        {statusTabs.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setStatusFilter(key)}
+            className={`px-4 py-2 rounded-full text-xs font-headline font-bold uppercase tracking-wider border transition-colors
+              ${statusFilter === key
+                ? key === 'inactive'
+                  ? 'bg-error/15 border-error/40 text-error'
+                  : 'bg-primary-fixed/15 border-primary-fixed/40 text-primary-fixed'
+                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
+              }`}
+          >
+            {label}
+            <span className="ml-1.5 opacity-70">({statusCounts[key]})</span>
+          </button>
+        ))}
       </div>
 
       {/* ── Search ─────────────────────────────────────────────────── */}
@@ -115,9 +154,15 @@ const AdminProducts = () => {
                         flex flex-col items-center text-center">
           <AlertTriangle className="w-12 h-12 text-on-surface-variant/40 mb-4" />
           <p className="text-on-surface-variant mb-3">
-            {searchQuery ? `No products match "${searchQuery}"` : 'No products yet'}
+            {searchQuery
+              ? `No products match "${searchQuery}"`
+              : statusFilter === 'inactive'
+                ? 'No inactive products'
+                : statusFilter === 'active'
+                  ? 'No active products'
+                  : 'No products yet'}
           </p>
-          {!searchQuery && (
+          {!searchQuery && statusFilter === 'all' && (
             <Link
               to="/admin/products/add"
               className="text-primary-fixed hover:underline text-sm font-headline font-bold"
@@ -159,7 +204,7 @@ const AdminProducts = () => {
                         <div className="w-10 h-10 bg-surface-container-highest rounded-lg
                                         overflow-hidden flex-shrink-0">
                           {product.image
-                            ? <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                            ? <img src={resolveMediaUrl(product.image)} alt={product.name} className="w-full h-full object-cover" />
                             : <div className="w-full h-full flex items-center justify-center">
                                 <Package className="w-4 h-4 text-on-surface-variant/40" />
                               </div>
@@ -252,7 +297,7 @@ const AdminProducts = () => {
                   <div className="w-14 h-14 bg-surface-container-highest rounded-lg
                                   overflow-hidden flex-shrink-0">
                     {product.image
-                      ? <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                      ? <img src={resolveMediaUrl(product.image)} alt={product.name} className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center">
                           <Package className="w-5 h-5 text-on-surface-variant/40" />
                         </div>

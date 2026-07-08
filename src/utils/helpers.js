@@ -1,3 +1,86 @@
+/** Format schedule time from API (e.g. "13:00:00" → "13:00"). */
+export const formatScheduleTime = (time) => {
+  if (!time) return '';
+  return String(time).slice(0, 5);
+};
+
+/** Monday (YYYY-MM-DD) of the week containing `date`. */
+export const getWeekStart = (date = new Date()) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return getWeekStart(new Date());
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Add `deltaWeeks` to a week_start Monday string. */
+export const shiftWeekStart = (weekStart, deltaWeeks) => {
+  const d = new Date(`${weekStart}T12:00:00`);
+  d.setDate(d.getDate() + deltaWeeks * 7);
+  return getWeekStart(d);
+};
+
+export const isCurrentWeek = (weekStart) => weekStart === getWeekStart();
+
+/** e.g. "Jun 2 – Jun 8, 2026" */
+export const formatWeekRange = (weekStart) => {
+  const start = new Date(`${weekStart}T12:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const opts = { month: 'short', day: 'numeric' };
+  const y = start.getFullYear() !== end.getFullYear() ? `, ${end.getFullYear()}` : `, ${start.getFullYear()}`;
+  return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', { ...opts, year: 'numeric' })}`;
+};
+
+/** Convert Monday date to value for &lt;input type="week" /&gt;. */
+export const dateToWeekInputValue = (weekStart) => {
+  const d = new Date(`${weekStart}T12:00:00`);
+  const thursday = new Date(d);
+  thursday.setDate(d.getDate() + 3);
+  const year = thursday.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const week = Math.ceil((((thursday - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+  const isoWeek = String(week).padStart(2, '0');
+  return `${year}-W${isoWeek}`;
+};
+
+/** Parse &lt;input type="week" /&gt; value to Monday YYYY-MM-DD. */
+export const weekInputValueToWeekStart = (value) => {
+  if (!value || !value.includes('-W')) return getWeekStart();
+  const [yearStr, weekStr] = value.split('-W');
+  const year = parseInt(yearStr, 10);
+  const week = parseInt(weekStr, 10);
+  const jan4 = new Date(year, 0, 4);
+  const day = jan4.getDay() || 7;
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - day + 1 + (week - 1) * 7);
+  return monday.toISOString().slice(0, 10);
+};
+
+/** Human-readable class time range; handles bad DB values like end at 00:00. */
+export const formatScheduleTimeRange = (start, end) => {
+  const s = formatScheduleTime(start);
+  const e = formatScheduleTime(end);
+  if (!s) return '—';
+  if (!e || e === '00:00' || (s && e <= s)) {
+    return `${s} (end time not set)`;
+  }
+  return `${s} – ${e}`;
+};
+
+/** Resolve product/avatar URLs (external links or Laravel /storage paths). */
+export const resolveMediaUrl = (url) => {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/storage')) {
+    const apiBase = import.meta.env.VITE_API_URL || '/api';
+    const origin = apiBase.replace(/\/api\/?$/, '') || '';
+    return origin ? `${origin}${url}` : url;
+  }
+  return url;
+};
+
 // Format currency
 export const formatCurrency = (amount, currency = 'USD') => {
   return new Intl.NumberFormat('en-US', {

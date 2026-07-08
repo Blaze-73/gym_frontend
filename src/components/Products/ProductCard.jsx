@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Star } from 'lucide-react';
+import { resolveMediaUrl } from '@/utils/helpers';
 
 // ✅ Note: ProductCard receives onAddToCart as a prop - no direct cart import needed.
 // The parent component (Store, etc.) handles the cart logic.
@@ -19,7 +20,7 @@ const ProductCard = ({ product, onAddToCart }) => {
         <div className="aspect-square overflow-hidden bg-surface-container-highest relative">
           {image ? (
             <img
-              src={image}
+              src={resolveMediaUrl(image)}
               alt={name}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
             />

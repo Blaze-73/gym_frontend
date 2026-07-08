@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Dumbbell, Instagram, Twitter, Facebook, Youtube } from 'lucide-react';
+import Logo from '@/components/common/Logo';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -10,9 +11,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {/* Brand Section */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link to="/" className="inline-block mb-6">
-              <span className="text-2xl font-black font-headline text-white tracking-widest">ALIEN</span>
-            </Link>
+            <Logo to="/" text="ALIEN" size="md" className="mb-6" />
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
               Elite performance training system designed for athletes who demand the extraordinary.
               Transform your potential into reality.

@@ -1,75 +1,115 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Shield, Zap, Crown, Star, ArrowRight } from 'lucide-react';
+import { Check, Shield, Zap, Crown, Star, ArrowRight, CheckCircle, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { membershipsAPI } from '@/services/api';
+import { paymentsAPI, subscriptionsAPI, plansAPI } from '@/services/api';
+import { enrichPlanFromApi, isUpgradePlan, isDowngradePlan } from '@/config/planUi';
+import { DEFAULT_PLANS } from '@/config/planDefaults';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
+import CheckoutForm, { emptyCheckoutForm } from '@/components/common/CheckoutForm';
 
 const Plans = () => {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requireSubscription = Boolean(location.state?.requireSubscription);
+  const isWelcome = Boolean(location.state?.welcome);
+  const isUpgradeFlow = Boolean(location.state?.upgrade);
+  const isDowngradeFlow = Boolean(location.state?.downgrade);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [checkoutForm, setCheckoutForm] = useState(emptyCheckoutForm);
+  const [checkoutFormKey, setCheckoutFormKey] = useState(0);
+  const [activeSubscription, setActiveSubscription] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
 
-  // Modernized plan data with "tiers"
-  const plans = [
-    {
-      id: 1,
-      name: 'S-TIER PULSE',
-      price: '49',
-      period: 'month',
-      tag: 'Essential',
-      popular: false,
-      features: ['24/7 Gym Access', 'Standard Equipment', 'Locker Room Access', 'Weekly Progress Track'],
-      color: 'from-zinc-700 to-zinc-900',
-      icon: <Zap className="w-5 h-5" />,
-    },
-    {
-      id: 2,
-      name: 'INTERSTELLAR',
-      price: '399',
-      period: 'year',
-      tag: 'Most Popular',
-      popular: true,
-      features: ['VIP Priority Access', 'All Premium Equipment', 'Sauna & Cryotherapy', '12 Personal Training Sessions', 'Custom Nutrition Protocol', 'Priority Booking', 'Guest Passes (2/mo)'],
-      color: 'from-primary-fixed/20 via-primary-fixed/10 to-black',
-      icon: <Crown className="w-5 h-5" />,
-    },
-    {
-      id: 3,
-      name: 'ALPHA ORBIT',
-      price: '129',
-      period: 'month',
-      tag: 'Advanced',
-      popular: false,
-      features: ['24/7 Gym Access', 'Premium Equipment', 'Recovery Zone Access', '3 Guest Passes / month', 'Monthly Assessment'],
-      color: 'from-zinc-700 to-zinc-900',
-      icon: <Star className="w-5 h-5" />,
-    },
-  ];
+  const loadPlans = (rawList) => {
+    const list = (Array.isArray(rawList) ? rawList : [])
+      .filter((p) => [1, 2, 3].includes(Number(p.id)))
+      .map(enrichPlanFromApi)
+      .sort((a, b) => a.id - b.id);
+    setPlans(list.length ? list : DEFAULT_PLANS.map(enrichPlanFromApi));
+  };
+
+  useEffect(() => {
+    plansAPI.getAll()
+      .then((res) => loadPlans(res.data))
+      .catch(() => loadPlans(DEFAULT_PLANS))
+      .finally(() => setPlansLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveSubscription(null);
+      return;
+    }
+    subscriptionsAPI.getMe()
+      .then((res) => setActiveSubscription(res.data))
+      .catch(() => setActiveSubscription(null));
+  }, [isAuthenticated]);
+
+  const subscribedPlanId = activeSubscription?.plan?.id ?? activeSubscription?.plan_id ?? null;
+
+  const isCurrentPlan = (planId) => subscribedPlanId != null && Number(subscribedPlanId) === Number(planId);
+  const canUpgradeTo = (planId) => isUpgradePlan(subscribedPlanId, planId);
+  const canDowngradeTo = (planId) => isDowngradePlan(subscribedPlanId, planId);
+  const downgradeUnlocked = !activeSubscription || Boolean(activeSubscription.downgrade_unlocked);
+  const downgradeWindowDays = activeSubscription?.downgrade_window_days ?? 5;
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setCheckoutForm(emptyCheckoutForm());
+    }
+  }, [isAuthenticated, user?.id]);
 
   const handleJoinPlan = (plan) => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
+    if (isCurrentPlan(plan.id)) {
+      navigate('/subscription');
+      return;
+    }
+    if (canDowngradeTo(plan.id) && !downgradeUnlocked) {
+      return;
+    }
     setSelectedPlan(plan);
+    setCheckoutError('');
+    setCheckoutForm(emptyCheckoutForm());
+    setCheckoutFormKey((key) => key + 1);
     setShowModal(true);
   };
 
   const handleConfirmRequest = async () => {
+    if (!selectedPlan) return;
+    if (!checkoutForm.customer_name?.trim() || !checkoutForm.customer_email?.trim()
+      || !checkoutForm.customer_phone?.trim() || !checkoutForm.customer_address?.trim()) {
+      setCheckoutError('Please fill in all contact fields.');
+      return;
+    }
+    setProcessing(true);
+    setCheckoutError('');
     try {
-      // Clean payload - backend now handles user_id automatically
-      await membershipsAPI.create({
+      const res = await paymentsAPI.checkoutPlan({
         plan_id: selectedPlan.id,
-        start_date: new Date().toISOString().split('T')[0],
+        ...checkoutForm,
       });
-      setShowModal(false);
-      alert('Your request has been transmitted to the Architect. Notification will follow upon approval.');
+      const approvalUrl = res.data?.approval_url;
+      if (approvalUrl) {
+        window.location.href = approvalUrl;
+        return;
+      }
+      setCheckoutError('Could not start PayPal checkout.');
     } catch (err) {
-      alert('Transmission failed: ' + (err.response?.data?.message || 'System error'));
+      setCheckoutError(err.response?.data?.message || 'Payment could not be started.');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -103,13 +143,85 @@ const Plans = () => {
           >
             Stop settling for average. Choose a membership tier designed to push your biology to its absolute limit.
           </motion.p>
+
+          {isDowngradeFlow && activeSubscription && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 max-w-2xl mx-auto p-5 rounded-2xl bg-white/5 border border-white/20 text-left"
+            >
+              <p className="text-gray-300 font-headline font-black uppercase text-sm tracking-wider">
+                Downgrade from {activeSubscription.plan?.name}
+              </p>
+              <p className="text-gray-400 text-sm mt-2">
+                Choose a lower tier below. Your saved workouts and nutrition history stay on your account.
+              </p>
+            </motion.div>
+          )}
+
+          {isUpgradeFlow && activeSubscription && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 max-w-2xl mx-auto p-5 rounded-2xl bg-primary-fixed/10 border border-primary-fixed/30 text-left"
+            >
+              <p className="text-primary-fixed font-headline font-black uppercase text-sm tracking-wider">
+                Upgrade from {activeSubscription.plan?.name}
+              </p>
+              <p className="text-gray-300 text-sm mt-2">
+                Pick a higher tier below. Your workouts, nutrition, and progress stay on your account.
+              </p>
+            </motion.div>
+          )}
+
+          {requireSubscription && !activeSubscription && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 max-w-2xl mx-auto p-5 rounded-2xl bg-primary-fixed/10 border border-primary-fixed/30 text-left"
+            >
+              <p className="text-primary-fixed font-headline font-black uppercase text-sm tracking-wider">
+                {isWelcome ? 'Account created — choose your plan' : 'Subscription required'}
+              </p>
+              <p className="text-gray-300 text-sm mt-2 leading-relaxed">
+                {isWelcome
+                  ? 'Welcome to Alien Fitness. Pick a membership plan and complete checkout to unlock your dashboard, workouts, and member features.'
+                  : 'You need an active membership plan before you can access the athlete dashboard.'}
+              </p>
+            </motion.div>
+          )}
+
+          {activeSubscription && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-fixed/10 border border-primary-fixed/30 text-primary-fixed text-sm font-bold"
+            >
+              <CheckCircle className="w-4 h-4" />
+              {activeSubscription.subscription_message || `Subscribed to ${activeSubscription.plan?.name}`}
+              <Link to="/dashboard" className="text-black/70 hover:text-black ml-2 underline text-xs uppercase">
+                Dashboard
+              </Link>
+              <Link to="/subscription" className="text-black/70 hover:text-black ml-1 underline text-xs uppercase">
+                Manage
+              </Link>
+            </motion.div>
+          )}
         </div>
       </section>
 
       {/* Pricing Grid */}
       <section className="py-12 px-4 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan, index) => (
+        {plansLoading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-fixed" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map((plan, index) => {
+            const PlanIcon = plan.Icon || Zap;
+            return (
             <motion.div
               key={plan.id}
               initial={{ opacity: 0, y: 30 }}
@@ -122,7 +234,12 @@ const Plans = () => {
                   : 'bg-zinc-900/50 border-white/10 hover:border-white/30'
                 }`}
             >
-              {plan.popular && (
+              {isCurrentPlan(plan.id) && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary-fixed text-black text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-1.5">
+                  <CheckCircle className="w-3 h-3" /> Your plan
+                </div>
+              )}
+              {plan.popular && !isCurrentPlan(plan.id) && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary-fixed text-black text-[10px] font-black uppercase rounded-full tracking-widest">
                   Elite Choice
                 </div>
@@ -130,7 +247,7 @@ const Plans = () => {
 
               <div className="flex items-center gap-3 mb-8">
                 <div className={`p-3 rounded-2xl ${plan.popular ? 'bg-primary-fixed text-black' : 'bg-white/5 text-primary-fixed'}`}>
-                  {plan.icon}
+                  <PlanIcon className="w-5 h-5" />
                 </div>
                 <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{plan.tag}</span>
               </div>
@@ -155,18 +272,46 @@ const Plans = () => {
               </div>
 
               <button
+                type="button"
                 onClick={() => handleJoinPlan(plan)}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all duration-300 
-                  ${plan.popular 
-                    ? 'bg-black text-primary-fixed hover:bg-zinc-900 shadow-xl' 
-                    : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'
-                }`}
+                disabled={
+                  isCurrentPlan(plan.id)
+                  || (canDowngradeTo(plan.id) && !downgradeUnlocked)
+                  || (subscribedPlanId != null && !canUpgradeTo(plan.id) && !canDowngradeTo(plan.id))
+                }
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all duration-300 flex items-center justify-center gap-2
+                  ${isCurrentPlan(plan.id)
+                    ? 'bg-primary-fixed text-black cursor-default border border-primary-fixed shadow-[0_0_20px_rgba(218,249,0,0.25)]'
+                    : canDowngradeTo(plan.id) && !downgradeUnlocked
+                      ? 'bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed opacity-60'
+                    : canDowngradeTo(plan.id)
+                      ? 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/20'
+                    : plan.popular
+                      ? 'bg-black text-primary-fixed hover:bg-zinc-900 shadow-xl'
+                      : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'
+                  }`}
               >
-                {plan.popular ? 'Begin Transformation' : 'Join Plan'}
+                {isCurrentPlan(plan.id) ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" /> Subscribed
+                  </>
+                ) : canUpgradeTo(plan.id) ? (
+                  <>Upgrade <ArrowRight className="w-4 h-4" /></>
+                ) : canDowngradeTo(plan.id) && !downgradeUnlocked ? (
+                  <>
+                    <Lock className="w-4 h-4" /> Downgrade locked
+                  </>
+                ) : canDowngradeTo(plan.id) ? (
+                  <>Downgrade <ArrowRight className="w-4 h-4" /></>
+                ) : (
+                  plan.popular ? 'Begin Transformation' : 'Join Plan'
+                )}
               </button>
             </motion.div>
-          ))}
-        </div>
+            );
+          })}
+          </div>
+        )}
       </section>
 
       {/* Trust Section */}
@@ -184,7 +329,7 @@ const Plans = () => {
       </section>
 
       {/* Modal Redesign */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Protocol Confirmation" size="md">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Protocol Confirmation" size="lg">
         {selectedPlan && (
           <div className="space-y-6 py-4">
             <div className="bg-black border border-white/10 rounded-3xl p-6 relative overflow-hidden group">
@@ -204,19 +349,36 @@ const Plans = () => {
               </div>
             </div>
 
+            <CheckoutForm
+              key={`checkout-${selectedPlan.id}-${checkoutFormKey}`}
+              form={checkoutForm}
+              onChange={setCheckoutForm}
+            />
+
             <div className="p-4 bg-primary-fixed/10 border border-primary-fixed/20 rounded-2xl flex gap-4">
               <div className="p-2 bg-primary-fixed/20 rounded-lg h-fit">
                 <Shield className="w-5 h-5 text-primary-fixed" />
               </div>
               <p className="text-xs text-gray-300 leading-relaxed">
-                By submitting this request, you agree to the Alien Performance terms. Our admin will review your profile and activate your access within 24 hours.
+                You will be redirected to PayPal to complete your subscription. Your plan activates immediately after successful payment.
               </p>
             </div>
 
+            {checkoutError && (
+              <div className="text-sm text-error bg-error/10 border border-error/30 rounded-xl p-3 space-y-2">
+                <p>{checkoutError}</p>
+                {checkoutError.includes('credentials missing') && (
+                  <Link to="/paypal-setup" className="inline-block text-primary-fixed font-bold underline text-xs uppercase">
+                    → Set up PayPal Sandbox now
+                  </Link>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               <Button variant="secondary" onClick={() => setShowModal(false)} className="flex-1 py-4">Cancel</Button>
-              <Button variant="primary" onClick={handleConfirmRequest} className="flex-1 py-4 flex items-center justify-center gap-2">
-                Submit Request <ArrowRight className="w-4 h-4" />
+              <Button variant="primary" onClick={handleConfirmRequest} disabled={processing} className="flex-1 py-4 flex items-center justify-center gap-2">
+                {processing ? 'Redirecting…' : 'Pay with PayPal'} <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           </div>

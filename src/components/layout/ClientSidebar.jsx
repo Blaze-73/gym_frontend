@@ -2,22 +2,29 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Dumbbell, Utensils, Users,
-  Settings, LogOut, Menu, X, ShoppingBag, ShoppingCart, Package,
+  LayoutDashboard, Dumbbell, Utensils, Users, Calendar,
+  Settings, LogOut, Menu, X, ShoppingBag, ShoppingCart, Package, Crown, ClipboardList, GraduationCap, Mail, QrCode,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { coachesAPI } from '@/services/api';
+import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
 import { useCart } from '@/contexts/CartContext';
 import { NotificationBell } from '@/components/common/NotificationDropdown';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
+import Logo from '@/components/common/Logo';
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard',  path: '/dashboard'  },
   { icon: Dumbbell,        label: 'Workouts',   path: '/workout'   },
   { icon: Utensils,        label: 'Nutrition',  path: '/nutrition' },
   { icon: Users,           label: 'Coaches',    path: '/coaches'   },
+  { icon: Calendar,        label: 'Class Schedule', path: '/schedule' },
+  { icon: QrCode,          label: 'Check In',       path: '/attendance-pass' },
   { icon: ShoppingBag,     label: 'Store',      path: '/store'     },
+  { icon: ClipboardList,   label: 'My Orders',  path: '/my-orders' },
   { icon: Package,         label: 'Membership Plans', path: '/plans' },
+  { icon: Crown,           label: 'My Subscription', path: '/subscription' },
   { icon: Settings,        label: 'Settings',   path: '/settings'  },
 ];
 
@@ -52,15 +59,10 @@ const NavLink = ({ item, isActive, onClick }) => {
   );
 };
 
-const SidebarBody = ({ onClose, location, user, onLogout }) => (
+const SidebarBody = ({ onClose, location, user, onLogout, navItems }) => (
   <div className="flex flex-col h-full">
     <div className="h-16 lg:h-20 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0">
-      <Link to="/" onClick={onClose} className="flex items-center gap-2.5">
-        <span className="w-2 h-2 rounded-sm bg-primary-fixed shadow-[0_0_8px_#daf900]" />
-        <span className="text-xl font-black font-headline text-white tracking-widest">
-          ALIEN FITNESS
-        </span>
-      </Link>
+      <Logo to="/" onClick={onClose} size="md" />
       {onClose && (
         <button
           onClick={onClose}
@@ -84,7 +86,7 @@ const SidebarBody = ({ onClose, location, user, onLogout }) => (
           <p className="font-headline font-bold text-white text-sm truncate">
             {user?.name || 'Athlete'}
           </p>
-          <p className="text-[11px] text-primary-fixed uppercase tracking-wider">Member</p>
+          <SubscriptionStatusBanner variant="inline" />
         </div>
       </div>
     </div>
@@ -93,7 +95,7 @@ const SidebarBody = ({ onClose, location, user, onLogout }) => (
       <p className="px-4 mb-3 text-[10px] font-headline font-bold uppercase tracking-[0.2em] text-gray-600">
         Navigation
       </p>
-      {NAV_ITEMS.map((item) => (
+      {navItems.map((item) => (
         <NavLink
           key={item.path}
           item={item}
@@ -123,9 +125,33 @@ const SidebarBody = ({ onClose, location, user, onLogout }) => (
 const ClientSidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isCoachStaff, setIsCoachStaff] = useState(false);
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isCoach } = useAuth();
   const { cartItems, setIsCartOpen } = useCart();
+
+  const coachAccount = isCoach();
+  const baseNav = coachAccount
+    ? NAV_ITEMS.filter((item) => !['/subscription', '/plans'].includes(item.path))
+    : NAV_ITEMS;
+
+  const sidebarNavItems = [
+    ...(coachAccount || isCoachStaff
+      ? [{ icon: GraduationCap, label: 'My Clients', path: '/coach-portal' }]
+      : []),
+    ...(!coachAccount
+      ? [{ icon: Mail, label: 'Coach Inbox', path: '/my-coach' }]
+      : []),
+    ...baseNav,
+  ].filter(
+    (item, index, arr) => arr.findIndex((x) => x.path === item.path) === index
+  );
+
+  useEffect(() => {
+    coachesAPI.isStaff()
+      .then((res) => setIsCoachStaff(!!res.data?.is_coach))
+      .catch(() => setIsCoachStaff(false));
+  }, [user?.id]);
 
   const handleLogout = async () => {
     try { 
@@ -170,6 +196,7 @@ const ClientSidebar = () => {
               location={location}
               user={user}
               onLogout={() => setShowLogoutModal(true)}
+              navItems={sidebarNavItems}
             />
           </motion.aside>
         )}
@@ -182,18 +209,14 @@ const ClientSidebar = () => {
           location={location}
           user={user}
           onLogout={() => setShowLogoutModal(true)}
+          navItems={sidebarNavItems}
         />
       </aside>
 
       <header className="lg:hidden fixed top-0 left-0 right-0 z-[45] h-16
                          bg-[#111]/95 backdrop-blur-md border-b border-white/5
                          flex items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-sm bg-primary-fixed shadow-[0_0_6px_#daf900]" />
-          <span className="text-lg font-black font-headline text-white tracking-widest">
-            ALIEN
-          </span>
-        </Link>
+        <Logo to="/" size="sm" />
 
         <div className="flex items-center gap-1">
           <NotificationBell />

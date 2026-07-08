@@ -51,17 +51,18 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className={`fixed inset-0 z-50 flex items-center justify-center p-4`}
           >
-            <div className={`w-full ${sizes[size]} bg-surface-container-high border border-white/5 rounded-lg shadow-2xl`}>
-              <div className="flex items-center justify-between p-6 border-b border-white/5">
+            <div className={`w-full ${sizes[size]} max-h-[90vh] flex flex-col bg-surface-container-high border border-white/5 rounded-lg shadow-2xl`}>
+              <div className="flex items-center justify-between p-6 border-b border-white/5 flex-shrink-0">
                 <h3 className="text-xl font-headline font-bold text-on-surface">{title}</h3>
                 <button
+                  type="button"
                   onClick={onClose}
                   className="p-2 hover:bg-white/5 rounded text-on-surface-variant hover:text-white transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6">
+              <div className="p-6 overflow-y-auto flex-1 min-h-0">
                 {children}
               </div>
             </div>

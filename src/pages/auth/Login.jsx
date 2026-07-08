@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveClientHomePath } from '@/utils/clientHomePath';
+import Logo from '@/components/common/Logo';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const sessionMessage = location.state?.message;
+  const returnTo = location.state?.returnTo;
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,13 +27,18 @@ const Login = () => {
 
     try {
       const responseData = await login(formData);
-      const redirectPath = localStorage.getItem('redirectPath');
+      const redirectPath = returnTo || localStorage.getItem('redirectPath');
       localStorage.removeItem('redirectPath');
 
       if (responseData.user?.role === 'admin') {
         navigate(redirectPath || '/admin');
+      } else if (responseData.user?.role === 'coach') {
+        navigate(redirectPath || '/coach-portal');
+      } else if (returnTo) {
+        navigate(returnTo);
       } else {
-        navigate(redirectPath || '/dashboard');
+        const home = await resolveClientHomePath(redirectPath || '/dashboard');
+        navigate(home, home === '/plans' ? { state: { requireSubscription: true } } : undefined);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
@@ -58,11 +68,11 @@ const Login = () => {
       >
         {/* LOGO AREA */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <h1 className="text-5xl font-black font-headline text-white tracking-widest italic">
-              ALIEN <span className="text-primary-fixed">FITNESS</span>
-            </h1>
-          </Link>
+          <Logo
+            to="/"
+            size="xl"
+            className="flex-col items-center justify-center gap-4 mx-auto"
+          />
           <div className="h-1 w-12 bg-primary-fixed mx-auto mt-4 rounded-full" />
           <p className="text-gray-400 mt-4 text-xs uppercase tracking-[0.3em] font-bold">
             Access the Command Center
@@ -75,6 +85,15 @@ const Login = () => {
             <h2 className="text-2xl font-black font-headline text-white uppercase italic">Welcome Back</h2>
             <p className="text-gray-400 mt-2 text-sm">Authenticate your identity to proceed</p>
           </div>
+
+          {sessionMessage && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+              className="mb-6 p-4 bg-primary-fixed/10 border border-primary-fixed/30 rounded-xl text-primary-fixed text-sm text-center"
+            >
+              {sessionMessage}
+            </motion.div>
+          )}
 
           {error && (
             <motion.div 

@@ -6,6 +6,7 @@ import { productsAPI, categoriesAPI } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext'; 
 import { useCart } from '@/contexts/CartContext'; 
 import CartDrawer from '@/components/common/CartDrawer';
+import { resolveMediaUrl } from '@/utils/helpers';
 
 const Store = () => {
   const navigate = useNavigate();
@@ -165,7 +166,7 @@ const Store = () => {
                     >
                       <div className="h-full w-full relative overflow-hidden">
                         <img 
-                          src={product.image} 
+                          src={resolveMediaUrl(product.image)} 
                           alt={product.name} 
                           loading="lazy" 
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale group-hover:grayscale-0"

@@ -1,259 +1,412 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Clock, Users, Plus, Trash2, LayoutGrid, List, MapPin } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Calendar, Users, Plus, LayoutGrid, List, MapPin } from 'lucide-react';
 import { schedulesAPI, coachesAPI } from '@/services/api';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
+import Select from '@/components/common/Select';
+import ScheduleWeekGrid from '@/components/schedule/ScheduleWeekGrid';
+import ScheduleClassCard from '@/components/schedule/ScheduleClassCard';
+import WeekPicker from '@/components/schedule/WeekPicker';
+import { formatScheduleTime, getWeekStart, formatWeekRange } from '@/utils/helpers';
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const initialFormState = {
+  class_name: '',
+  day_of_week: 'Monday',
+  start_time: '09:00',
+  end_time: '10:00',
+  capacity: 20,
+  room: '',
+  coach_id: '',
+  status: 'active',
+  week_start: getWeekStart(),
+};
 
 const AdminSchedule = () => {
   const [schedules, setSchedules] = useState([]);
+  const [coaches, setCoaches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [view, setView] = useState('week'); // 'week' or 'list'
-  
-  const initialFormState = {
-    class_name: '', 
-    day_of_week: 'Monday', 
-    start_time: '09:00', 
-    end_time: '10:00', 
-    capacity: 20, 
-    room: ''
-  };
-
+  const [editingId, setEditingId] = useState(null);
+  const [view, setView] = useState('week');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [formData, setFormData] = useState(initialFormState);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState(getWeekStart());
 
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [selectedWeek]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await schedulesAPI.getAll();
-      setSchedules(res.data.data || res.data);
+      const [schedRes, coachRes] = await Promise.all([
+        schedulesAPI.getAllAdmin(selectedWeek),
+        coachesAPI.getAll(),
+      ]);
+      setSchedules(Array.isArray(schedRes.data) ? schedRes.data : schedRes.data?.data || []);
+      const coachList = coachRes.data?.coaches || coachRes.data;
+      setCoaches(Array.isArray(coachList) ? coachList : []);
     } catch (e) {
-      console.error("API Error:", e);
+      console.error('API Error:', e);
+      setSchedules([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const coachLabel = (c) => c.display_name || c.name || c.user?.name || `Coach #${c.id}`;
+
+  const coachOptions = [
+    { value: '', label: 'No coach assigned' },
+    ...coaches.map((c) => ({ value: String(c.id), label: coachLabel(c) })),
+  ];
+
+  const statusCounts = {
+    all: schedules.length,
+    active: schedules.filter((s) => s.status === 'active').length,
+    inactive: schedules.filter((s) => s.status !== 'active').length,
+  };
+
+  const filteredSchedules = schedules.filter((s) => {
+    if (statusFilter === 'active') return s.status === 'active';
+    if (statusFilter === 'inactive') return s.status !== 'active';
+    return true;
+  });
+
+  const openCreate = () => {
+    setEditingId(null);
+    setFormData({ ...initialFormState, week_start: selectedWeek });
+    setFormError('');
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (item) => {
+    setEditingId(item.id);
+    setFormData({
+      class_name: item.class_name || '',
+      day_of_week: item.day_of_week || 'Monday',
+      start_time: formatScheduleTime(item.start_time) || '09:00',
+      end_time: formatScheduleTime(item.end_time) || '10:00',
+      capacity: item.capacity ?? 20,
+      room: item.room || '',
+      coach_id: item.coach_id ? String(item.coach_id) : '',
+      status: item.status || 'active',
+      week_start: item.week_start || selectedWeek,
+    });
+    setFormError('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({ ...initialFormState, week_start: selectedWeek });
+    setFormError('');
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+    setFormError('');
+
+    if (formData.start_time >= formData.end_time) {
+      setFormError('End time must be after start time.');
+      return;
+    }
+
+    setSaving(true);
     try {
-      await schedulesAPI.create({
+      const payload = {
         ...formData,
-        capacity: parseInt(formData.capacity)
-      });
-      setIsModalOpen(false);
-      setFormData(initialFormState);
+        capacity: parseInt(formData.capacity, 10),
+        coach_id: formData.coach_id ? parseInt(formData.coach_id, 10) : null,
+      };
+
+      if (editingId) {
+        await schedulesAPI.update(editingId, payload);
+      } else {
+        await schedulesAPI.create(payload);
+      }
+
+      closeModal();
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || "Save failed");
+      const errors = err.response?.data?.errors;
+      const first = errors && Object.values(errors).flat()[0];
+      setFormError(first || err.response?.data?.message || 'Save failed');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Delete this class?")) {
-      try {
-        await schedulesAPI.delete(id);
-        fetchData();
-      } catch (e) {
-        alert("Delete failed");
-      }
+    if (!window.confirm('Delete this class?')) return;
+    try {
+      await schedulesAPI.delete(id);
+      fetchData();
+    } catch {
+      alert('Delete failed');
     }
   };
 
-  // Calculate operational stats
-  const totalClasses = schedules.length;
-  const totalCapacity = schedules.reduce((acc, curr) => acc + parseInt(curr.capacity || 0), 0);
+  const totalClasses = filteredSchedules.length;
+  const totalCapacity = filteredSchedules.reduce((acc, curr) => acc + parseInt(curr.capacity || 0, 10), 0);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-fixed" />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-fixed" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 p-2 max-w-[1600px] mx-auto">
-      {/* HEADER SECTION */}
+    <div className="space-y-8 max-w-[1600px] mx-auto min-w-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black font-headline text-white uppercase italic tracking-tighter">
+          <h1 className="text-3xl sm:text-4xl font-black font-headline text-white uppercase italic tracking-tighter">
             SCHEDULE <span className="text-primary-fixed">ARCHITECTURE</span>
           </h1>
           <p className="text-gray-400 mt-1 uppercase text-xs tracking-widest font-bold">
-            System-wide class distribution & capacity management
+            {formatWeekRange(selectedWeek)} · {statusCounts.active} active · {statusCounts.inactive} inactive
           </p>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex bg-surface-container-high p-1 rounded-xl border border-white/5">
-            <button 
-              onClick={() => setView('week')} 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${view === 'week' ? 'bg-primary-fixed text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            <button
+              type="button"
+              onClick={() => setView('week')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${view === 'week' ? 'bg-primary-fixed text-black' : 'text-gray-400 hover:text-white'}`}
             >
               <LayoutGrid className="w-3.5 h-3.5" /> Week
             </button>
-            <button 
-              onClick={() => setView('list')} 
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${view === 'list' ? 'bg-primary-fixed text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${view === 'list' ? 'bg-primary-fixed text-black' : 'text-gray-400 hover:text-white'}`}
             >
               <List className="w-3.5 h-3.5" /> List
             </button>
           </div>
-
-          <button 
-            onClick={() => setIsModalOpen(true)} 
-            className="flex items-center gap-2 px-6 py-3 bg-primary-fixed text-black rounded-xl text-sm font-headline font-black uppercase hover:scale-105 transition-transform shadow-lg shadow-primary-fixed/20"
+          <button
+            type="button"
+            onClick={openCreate}
+            className="flex items-center gap-2 px-6 py-3 bg-primary-fixed text-black rounded-xl text-sm font-headline font-black uppercase hover:scale-105 transition-transform"
           >
             <Plus className="w-4 h-4" /> New Class
           </button>
         </div>
       </div>
 
-      {/* KPI BAR */}
+      <WeekPicker weekStart={selectedWeek} onChange={setSelectedWeek} />
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'active', label: 'Active' },
+          { key: 'inactive', label: 'Inactive' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setStatusFilter(key)}
+            className={`px-4 py-2 rounded-full text-xs font-headline font-bold uppercase tracking-wider border transition-colors
+              ${statusFilter === key
+                ? key === 'inactive'
+                  ? 'bg-error/15 border-error/40 text-error'
+                  : 'bg-primary-fixed/15 border-primary-fixed/40 text-primary-fixed'
+                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+              }`}
+          >
+            {label} ({statusCounts[key]})
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="bg-surface-container-high border border-white/5 p-6 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-primary-fixed/10 rounded-lg text-primary-fixed"><Calendar className="w-6 h-6" /></div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Total Classes</p>
+            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Showing</p>
             <p className="text-2xl font-black text-white">{totalClasses}</p>
           </div>
         </div>
         <div className="bg-surface-container-high border border-white/5 p-6 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400"><Users className="w-6 h-6" /></div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Max Capacity</p>
+            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Capacity</p>
             <p className="text-2xl font-black text-white">{totalCapacity} <span className="text-sm text-gray-500 font-normal">slots</span></p>
           </div>
         </div>
         <div className="bg-surface-container-high border border-white/5 p-6 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400"><MapPin className="w-6 h-6" /></div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Active Zones</p>
-            <p className="text-2xl font-black text-white">{[...new Set(schedules.map(s => s.room))].length}</p>
+            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Rooms</p>
+            <p className="text-2xl font-black text-white">{[...new Set(filteredSchedules.map((s) => s.room).filter(Boolean))].length}</p>
           </div>
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
-      <div className="min-h-[600px]">
-        {view === 'week' ? (
-          /* WEEKLY MASTER GRID */
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-            {daysOfWeek.map(day => (
-              <div key={day} className="space-y-4">
-                <div className="text-center py-3 bg-surface-container-high border border-white/5 rounded-t-xl">
-                  <p className="text-xs font-black text-primary-fixed uppercase tracking-widest">{day}</p>
-                </div>
-                <div className="space-y-3">
-                  {schedules.filter(s => s.day_of_week === day).map(item => (
-                    <motion.div 
-                      key={item.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-surface-container-high border border-white/5 p-4 rounded-xl group hover:border-primary-fixed/50 transition-all relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 right-0 w-1 h-full bg-primary-fixed opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <h4 className="text-sm font-black text-white uppercase mb-3 line-clamp-1">{item.class_name}</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-[10px] text-gray-400 uppercase font-bold">
-                          <Clock className="w-3 h-3" /> {item.start_time} - {item.end_time}
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-gray-400 uppercase font-bold">
-                          <Users className="w-3 h-3" /> {item.capacity} Max
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-primary-fixed uppercase font-bold">
-                          <MapPin className="w-3 h-3" /> {item.room || 'Main Gym'}
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => handleDelete(item.id)} 
-                        className="absolute bottom-2 right-2 p-1.5 bg-error/10 text-error rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-error hover:text-white"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </motion.div>
-                  ))}
-                  {schedules.filter(s => s.day_of_week === day).length === 0 && (
-                    <div className="p-4 text-center border border-white/5 border-dashed rounded-xl">
-                      <p className="text-[10px] text-gray-600 uppercase font-bold">No Classes</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+      <div className="min-h-[400px]">
+        {filteredSchedules.length === 0 ? (
+          <div className="py-20 text-center bg-surface-container-high rounded-2xl border border-dashed border-white/10">
+            <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-500 font-headline uppercase text-sm">
+              {statusFilter === 'inactive'
+                ? 'No inactive classes this week'
+                : statusFilter === 'active'
+                  ? 'No active classes this week'
+                  : 'No classes for this week — add one with New Class'}
+            </p>
           </div>
+        ) : view === 'week' ? (
+          <ScheduleWeekGrid
+            schedules={filteredSchedules}
+            showActions
+            onEdit={openEdit}
+            onDelete={handleDelete}
+          />
         ) : (
-          /* LIST VIEW */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {schedules.length === 0 ? (
-              <div className="col-span-full py-20 text-center bg-surface-container-high rounded-2xl border border-dashed border-white/10">
-                <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-500 font-headline uppercase">No classes scheduled yet</p>
-              </div>
-            ) : (
-              schedules.map((item) => (
-                <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-surface-container-high border border-white/5 rounded-2xl p-6 group hover:border-primary-fixed/50 transition-all">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-3 bg-primary-fixed/10 rounded-lg text-primary-fixed">
-                      <Clock className="w-5 h-5" />
-                    </div>
-                    <button onClick={() => handleDelete(item.id)} className="p-2 bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <h3 className="text-xl font-black font-headline text-white uppercase mb-1">{item.class_name}</h3>
-                  <p className="text-primary-fixed text-sm font-bold mb-4">{item.day_of_week}</p>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-xs font-headline text-gray-400 uppercase">
-                    <div className="flex items-center gap-2"><Clock className="w-3 h-3" /> {item.start_time} - {item.end_time}</div>
-                    <div className="flex items-center gap-2"><Users className="w-3 h-3" /> {item.capacity} Slots</div>
-                    <div className="flex items-center gap-2"><MapPin className="w-3 h-3" /> {item.room || 'Main Gym'}</div>
-                  </div>
-                </motion.div>
-              ))
-            )}
+            {filteredSchedules.map((item) => (
+              <motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                <ScheduleClassCard item={item} showActions onEdit={openEdit} onDelete={handleDelete} />
+              </motion.div>
+            ))}
           </div>
         )}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Schedule New Class" size="md">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        title={editingId ? 'Edit Class' : 'Schedule New Class'}
+        size="md"
+      >
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="flex flex-col">
-            <label className="text-xs font-headline text-gray-500 uppercase mb-2">Class Name</label>
-            <input type="text" value={formData.class_name} onChange={e => setFormData({...formData, class_name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed" placeholder="e.g. Power Lifting" required />
+          {formError && (
+            <p className="text-sm text-error bg-error/10 border border-error/30 rounded-lg px-3 py-2">{formError}</p>
+          )}
+
+          <div>
+            <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Week</label>
+            <WeekPicker
+              weekStart={formData.week_start || selectedWeek}
+              onChange={(week_start) => setFormData((f) => ({ ...f, week_start }))}
+              className="!p-3"
+            />
+            <p className="text-[10px] text-gray-600 mt-2">
+              Class will appear on {formatWeekRange(formData.week_start || selectedWeek)}
+            </p>
           </div>
+
+          <div>
+            <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Class Name</label>
+            <input
+              type="text"
+              value={formData.class_name}
+              onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed"
+              placeholder="e.g. Power Lifting"
+              required
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col">
-              <label className="text-xs font-headline text-gray-500 uppercase mb-2">Day</label>
-              <select value={formData.day_of_week} onChange={e => setFormData({...formData, day_of_week: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed">
-                {daysOfWeek.map(d => (
-                  <option key={d} value={d} className="bg-neutral-900 text-white">{d}</option>
-                ))}
-              </select>
+            <div>
+              <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Day</label>
+              <Select
+                value={formData.day_of_week}
+                onChange={(day_of_week) => setFormData({ ...formData, day_of_week })}
+                options={DAYS.map((d) => ({ value: d, label: d }))}
+              />
             </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-headline text-gray-500 uppercase mb-2">Capacity</label>
-              <input type="number" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed" required />
+            <div>
+              <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Capacity</label>
+              <input
+                type="number"
+                min={1}
+                value={formData.capacity}
+                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed"
+                required
+              />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex- la-col">
-              <label className="text-xs font-headline text-gray-500 uppercase mb-2">Start Time</label>
-              <input type="time" value={formData.start_time} onChange={e => setFormData({...formData, start_time: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed" required />
+            <div>
+              <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Start</label>
+              <input
+                type="time"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed"
+                required
+              />
             </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-headline text-gray-500 uppercase mb-2">End Time</label>
-              <input type="time" value={formData.end_time} onChange={e => setFormData({...formData, end_time: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed" required />
+            <div>
+              <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">End</label>
+              <input
+                type="time"
+                value={formData.end_time}
+                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed"
+                required
+              />
             </div>
           </div>
-          <div className="flex flex-col">
-            <label className="text-xs font-headline text-gray-500 uppercase mb-2">Room / Zone</label>
-            <input type="text" value={formData.room} onChange={e => setFormData({...formData, room: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed" placeholder="e.g. Studio A, Heavy Zone" />
+
+          <div>
+            <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Room / Zone</label>
+            <input
+              type="text"
+              value={formData.room}
+              onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-fixed"
+              placeholder="e.g. Studio A"
+            />
           </div>
-          <Button type="submit" className="w-full py-4 bg-primary-fixed text-black hover:bg-primary-fixed/90 font-headline font-black uppercase rounded-xl transition-all">Create Class</Button>
+
+          <div>
+            <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Coach</label>
+            <Select
+              value={formData.coach_id}
+              onChange={(coach_id) => setFormData({ ...formData, coach_id })}
+              placeholder="Assign coach"
+              options={coachOptions}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-headline text-gray-500 uppercase mb-2 block">Status</label>
+            <div className="flex gap-4">
+              {['active', 'inactive'].map((s) => (
+                <label key={s} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="schedule_status"
+                    value={s}
+                    checked={formData.status === s}
+                    onChange={() => setFormData({ ...formData, status: s })}
+                    className="accent-primary-fixed"
+                  />
+                  <span className="text-sm font-headline font-bold uppercase text-gray-300">{s}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            disabled={saving}
+            className="w-full py-4 bg-primary-fixed text-black font-headline font-black uppercase rounded-xl"
+          >
+            {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Class'}
+          </Button>
         </form>
       </Modal>
     </div>

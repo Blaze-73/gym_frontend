@@ -2,20 +2,25 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, Users, Calendar, Package, Settings,
-  Search, LogOut, Menu, X, ChevronDown, ShoppingBag, ShoppingCart,
+  LayoutDashboard, Users, Calendar, Package, Settings, ClipboardList, Crown, GraduationCap,
+  Search, LogOut, Menu, X, ChevronDown, ShoppingBag, ShoppingCart, QrCode,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { NotificationBell } from '@/components/common/NotificationDropdown';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
+import Logo from '@/components/common/Logo';
 
 const NAV_ITEMS = [
   { path: '/admin',          label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/members',  label: 'Members',   icon: Users           },
+  { path: '/admin/coaches',  label: 'Coaches',   icon: GraduationCap   },
+  { path: '/admin/attendance', label: 'Attendance', icon: QrCode     },
   { path: '/admin/schedule', label: 'Schedule',  icon: Calendar        },
   { path: '/admin/products', label: 'Products',  icon: Package         },
+  { path: '/admin/orders',   label: 'Orders',    icon: ClipboardList   },
+  { path: '/admin/subscriptions', label: 'Subscriptions', icon: Crown },
   { path: '/admin/settings', label: 'Settings',  icon: Settings        },
 ];
 
@@ -52,10 +57,7 @@ const NavLink = ({ item, isActive }) => {
 const SidebarBody = ({ location, user, onLogout, onClose }) => (
   <div className="flex flex-col h-full">
     <div className="h-16 lg:h-20 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0">
-      <Link to="/" className="flex items-center gap-2.5">
-        <span className="w-2 h-2 rounded-sm bg-primary-fixed shadow-[0_0_8px_#daf900]" />
-        <span className="text-xl font-black font-headline text-white tracking-widest">ALIEN</span>
-      </Link>
+      <Logo to="/" size="md" />
       {onClose && (
         <button
           onClick={onClose}
@@ -101,11 +103,21 @@ const SidebarBody = ({ location, user, onLogout, onClose }) => (
         </p>
         <Link
           to="/store"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400
-                     hover:text-white hover:bg-white/5 transition-all group"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
+            location.pathname.startsWith('/store') ? 'bg-primary-fixed/10 text-primary-fixed' : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
         >
           <ShoppingBag className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
           <span className="font-headline font-bold text-sm uppercase tracking-wider">Store</span>
+        </Link>
+        <Link
+          to="/plans"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
+            location.pathname.startsWith('/plans') ? 'bg-primary-fixed/10 text-primary-fixed' : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Package className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+          <span className="font-headline font-bold text-sm uppercase tracking-wider">Plans</span>
         </Link>
       </div>
     </nav>
@@ -218,10 +230,7 @@ const AdminLayout = () => {
           </div>
 
           <div className="lg:hidden flex-1">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-sm bg-primary-fixed shadow-[0_0_6px_#daf900]" />
-              <span className="text-lg font-black font-headline text-white tracking-widest">ALIEN</span>
-            </Link>
+            <Logo to="/" size="sm" />
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
@@ -328,7 +337,7 @@ const AdminLayout = () => {
         <div className="text-center space-y-6 py-4">
           <p className="text-gray-400">Are you sure you want to leave the system? Your session will be terminated.</p>
           <div className="flex gap-3">
-            <Button onClick={() => setConfirm .setConfirmLogout(false)} variant="secondary" className="flex-1">Cancel</Button>
+            <Button onClick={() => setConfirmLogout(false)} variant="secondary" className="flex-1">Cancel</Button>
             <Button onClick={executeLogout} variant="danger" className="flex-1">Logout</Button>
           </div>
         </div>

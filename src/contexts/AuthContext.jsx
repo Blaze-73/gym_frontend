@@ -89,6 +89,7 @@ export const AuthProvider = ({ children }) => {
 
   const isAdmin = () => user?.role === 'admin';
   const isClient = () => user?.role === 'client';
+  const isCoach = () => user?.role === 'coach';
 
   const value = {
     user,
@@ -100,6 +101,7 @@ export const AuthProvider = ({ children }) => {
     updateUser,
     isAdmin,
     isClient,
+    isCoach,
     isAuthenticated: !!token,
   };
 

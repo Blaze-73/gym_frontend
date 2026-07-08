@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Shield, Bell, Save, Upload, ToggleRight, ToggleLeft, Crown, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { profileAPI, membershipsAPI } from '@/services/api';
+import { profileAPI, subscriptionsAPI } from '@/services/api';
+import { useNavigate } from 'react-router-dom';
 
 const Settings = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [membership, setMembership] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -39,22 +41,25 @@ const Settings = () => {
 
   const fetchMembership = async () => {
     try {
-      const res = await membershipsAPI.getMe(); 
-      setMembership(res.data); // res.data is now the single membership object
-    } catch (err) { 
-      console.error("Error fetching membership:", err); 
+      const res = await subscriptionsAPI.getMe();
+      setMembership(res.data);
+    } catch {
+      setMembership(null);
     }
   };
 
 
   const handleCancelMembership = async () => {
-    if (!window.confirm('Are you sure you want to terminate your membership protocol?')) return;
+    if (!window.confirm('Terminate your membership? You will be logged out. Your workout and nutrition history will be saved.')) return;
     try {
-      await membershipsAPI.delete(membership.id);
-      setMembership(null);
-      setMessage({ type: 'success', text: 'Membership terminated successfully.' });
+      const res = await subscriptionsAPI.cancel();
+      await logout();
+      navigate('/login', {
+        replace: true,
+        state: { message: res.data?.message || 'Membership terminated.' },
+      });
     } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to cancel membership.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to cancel membership.' });
     }
   };
 
@@ -172,13 +177,11 @@ const Settings = () => {
                     <Crown className="w-8 h-8" />
                   </div>
                   <span className={`px-4 py-1 text-[10px] font-black uppercase rounded-full tracking-widest border ${
-                    membership?.status === 'active' 
-                      ? 'bg-primary-fixed text-black border-primary-fixed shadow-[0_0_15px_rgba(218,249,0,0.3)]' 
-                      : membership?.status === 'pending'
-                      ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' 
+                    membership?.payment_status === 'paid'
+                      ? 'bg-primary-fixed text-black border-primary-fixed shadow-[0_0_15px_rgba(218,249,0,0.3)]'
                       : 'bg-white/5 text-gray-500 border-white/10'
                   }`}>
-                    {membership?.status || 'Guest'}
+                    {membership?.payment_status === 'paid' ? 'Subscribed' : (membership?.payment_status || 'Guest')}
                   </span>
                 </div>
 
@@ -193,21 +196,14 @@ const Settings = () => {
                   </p>
                 </div>
 
-                {membership && (
+                {membership?.payment_status === 'paid' && (
                   <div className="flex gap-3">
-                    {membership.status === 'pending' ? (
-                      <div className="w-full p-4 bg-black/40 border border-white/5 rounded-2xl flex items-center gap-3">
-                        <div className="w-2 h-2 bg-yellow-500 animate-pulse rounded-full" />
-                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Awaiting Architect Approval</p>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={handleCancelMembership}
-                        className="w-full py-3 bg-error/10 text-error border border-error/20 font-headline font-bold uppercase text-xs rounded-xl hover:bg-error hover:text-white transition-all"
-                      >
-                        Terminate Membership
-                      </button>
-                    )}
+                    <button
+                      onClick={handleCancelMembership}
+                      className="w-full py-3 bg-error/10 text-error border border-error/20 font-headline font-bold uppercase text-xs rounded-xl hover:bg-error hover:text-white transition-all"
+                    >
+                      Terminate Membership
+                    </button>
                   </div>
                 )}
               </div>

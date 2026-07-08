@@ -19,6 +19,9 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -80,15 +83,64 @@ export const workoutsAPI = {
 
 // ============ CLIENT: NUTRITION ============
 export const nutritionAPI = {
+  getDay: (date) => api.get(`/nutrition/${date}`),
+  getHistory: (days = 14) => api.get('/nutrition/history', { params: { days } }),
   getToday: (date) => api.get(`/nutrition/${date}`),
   logMeal: (data) => api.post('/nutrition/meals', data),
+  deleteMeal: (id) => api.delete(`/nutrition/meals/${id}`),
   updateWater: (data) => api.post('/nutrition', data),
+  updateTargets: (data) => api.post('/nutrition', data),
+};
+
+// ============ SITE REVIEWS (homepage) ============
+export const siteReviewsAPI = {
+  getAll: () => api.get('/site-reviews'),
+  getMine: () => api.get('/site-reviews/me'),
+  submit: (data) => api.post('/site-reviews', data),
+  update: (id, data) => api.put(`/site-reviews/${id}`, data),
 };
 
 // ============ CLIENT: COACHES ============
 export const coachesAPI = {
   getAll: () => api.get('/coaches'),
-  assign: (data) => api.post('/coach/assign', data), // e.g. { coach_id: 1 }
+  getMyCoach: () => api.get('/coach/my-coach'),
+  assign: (data) => api.post('/coach/assign', data),
+  cancelRequest: () => api.post('/coach/cancel-request'),
+  endAssignment: () => api.post('/coach/end-assignment'),
+  cancelLeaveRequest: () => api.post('/coach/cancel-leave'),
+  changeCoach: (data) => api.post('/coach/change', data),
+  isStaff: () => api.get('/coach/is-staff'),
+  getClients: () => api.get('/coach/clients'),
+  getClientNutrition: (userId, date) => api.get(`/coach/clients/${userId}/nutrition`, { params: { date } }),
+  getClientWorkouts: (userId) => api.get(`/coach/clients/${userId}/workouts`),
+  getClientDeliverables: (userId) => api.get(`/coach/clients/${userId}/deliverables`),
+  sendDeliverable: (userId, data) => api.post(`/coach/clients/${userId}/deliverables`, data),
+  getInbox: () => api.get('/coach/inbox'),
+  sendMessageToCoach: (data) => api.post('/coach/messages', data),
+  markDeliverableRead: (id) => api.patch(`/coach/deliverables/${id}/read`),
+  getReviews: (coachId) => api.get(`/coaches/${coachId}/reviews`),
+  getMyReview: (coachId) => api.get(`/coach/reviews/coach/${coachId}`),
+  submitReview: (data) => api.post('/coach/reviews', data),
+  updateReview: (id, data) => api.put(`/coach/reviews/${id}`, data),
+};
+
+// ============ ADMIN: COACHES ============
+export const adminCoachesAPI = {
+  getAll: () => api.get('/admin/coaches'),
+  getRequests: () => api.get('/admin/coach-requests'),
+  getLeaveRequests: () => api.get('/admin/coach-leave-requests'),
+  approveRequest: (id) => api.post(`/admin/coach-requests/${id}/approve`),
+  rejectRequest: (id) => api.post(`/admin/coach-requests/${id}/reject`),
+  approveLeaveRequest: (id) => api.post(`/admin/coach-leave-requests/${id}/approve`),
+  rejectLeaveRequest: (id) => api.post(`/admin/coach-leave-requests/${id}/reject`),
+  endAssignment: (id) => api.post(`/admin/coach-assignments/${id}/end`),
+  assignClient: (data) => api.post('/admin/coach-assignments/assign', data),
+  getMemberAssignment: (userId) => api.get(`/admin/members/${userId}/coach-assignment`),
+  create: (data) => api.post('/coaches', data),
+  update: (id, data) => api.put(`/coaches/${id}`, data),
+  delete: (id) => api.delete(`/coaches/${id}`),
+  getMemberNutrition: (userId, date) => api.get(`/admin/members/${userId}/nutrition`, { params: { date } }),
+  getMemberWorkouts: (userId) => api.get(`/admin/members/${userId}/workouts`),
 };
 
 // ============ ADMIN: PLANS ============
@@ -98,6 +150,42 @@ export const plansAPI = {
   create: (data) => api.post('/plans', data),
   update: (id, data) => api.put(`/plans/${id}`, data),
   delete: (id) => api.delete(`/plans/${id}`),
+};
+
+// ============ SUBSCRIPTIONS & PAYMENTS ============
+export const entitlementsAPI = {
+  getMe: () => api.get('/entitlements/me'),
+};
+
+export const subscriptionsAPI = {
+  getMe: () => api.get('/subscriptions/me'),
+  getAlerts: () => api.get('/subscriptions/alerts'),
+  getHistory: () => api.get('/subscriptions/history'),
+  cancel: () => api.post('/subscriptions/cancel'),
+};
+
+export const notificationsAPI = {
+  getAll: () => api.get('/notifications'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all'),
+  dismiss: (id) => api.delete(`/notifications/${id}`),
+};
+
+export const adminNotificationsAPI = {
+  getAll: () => api.get('/admin/notifications'),
+};
+
+export const adminSubscriptionsAPI = {
+  getAll: (params) => api.get('/admin/subscriptions', { params }),
+  terminate: (id) => api.post(`/admin/subscriptions/${id}/terminate`),
+};
+
+export const paymentsAPI = {
+  status: () => api.get('/payments/status'),
+  checkoutPlan: (data) => api.post('/payments/plan', data),
+  checkoutStore: (data) => api.post('/payments/store', data),
+  capture: (data) => api.post('/payments/capture', data),
+  cancel: (data) => api.post('/payments/cancel', data),
 };
 
 // ============ ADMIN: MEMBERSHIPS ============
@@ -123,24 +211,40 @@ export const usersAPI = {
 // ============ ADMIN: ATTENDANCE ============
 export const attendanceAPI = {
   getActive: () => api.get('/attendance/active'),
+  getToday: () => api.get('/attendance/today'),
   history: () => api.get('/attendance/history'),
   checkIn: () => api.post('/attendance/check-in'),
   checkOut: () => api.post('/attendance/check-out'),
+  scanGym: (token) => api.post('/attendance/scan-gym', { token }),
+};
+
+export const adminAttendanceAPI = {
+  getGymQr: () => api.get('/admin/attendance/qr'),
+  regenerateGymQr: () => api.post('/admin/attendance/qr/regenerate'),
+  getDaily: (params) => api.get('/admin/attendance/daily', { params }),
+  getActive: () => api.get('/attendance/active'),
 };
 
 // admin schedules
 export const schedulesAPI = {
-  getAll: () => api.get('/schedules'),
-   create: (data) => api.post('/schedules', data),
-   update: (id, data) => api.put(`/schedules/${id}`, data),
-   delete: (id) => api.delete(`/schedules/${id}`),
+  getAll: (weekStart) => api.get('/schedules', { params: weekStart ? { week_start: weekStart } : {} }),
+  getAllAdmin: (weekStart) => api.get('/admin/schedules', { params: weekStart ? { week_start: weekStart } : {} }),
+  getMyClasses: (weekStart) => api.get('/coach/my-classes', { params: weekStart ? { week_start: weekStart } : {} }),
+  create: (data) => api.post('/schedules', data),
+  update: (id, data) => api.put(`/schedules/${id}`, data),
+  delete: (id) => api.delete(`/schedules/${id}`),
 };
 // ============ ADMIN: PRODUCTS ============
 export const productsAPI = {
   getAll: () => api.get('/products'),
+  getAllAdmin: () => api.get('/admin/products'),
   getOne: (id) => api.get(`/products/${id}`),
   create: (data) => api.post('/products', data),
-  update: (id, data) => api.put(`/products/${id}`, data),
+  update: (id, data) => (
+    data instanceof FormData
+      ? api.post(`/products/${id}`, data)
+      : api.put(`/products/${id}`, data)
+  ),
   delete: (id) => api.delete(`/products/${id}`),
   updateStock: (id, data) => api.put(`/products/${id}/stock`, data),
 };
@@ -153,7 +257,7 @@ export const categoriesAPI = {
   delete: (id) => api.delete(`/categories/${id}`),
 };
 
-// ============ ADMIN: ORDERS ============
+// ============ ORDERS (client) ============
 export const ordersAPI = {
   getAll: () => api.get('/orders'),
   getOne: (id) => api.get(`/orders/${id}`),
@@ -162,10 +266,18 @@ export const ordersAPI = {
   statistics: () => api.get('/orders/statistics'),
 };
 
+// ============ ADMIN: ORDERS & PAYMENTS ============
+export const adminOrdersAPI = {
+  getStoreOrders: () => api.get('/admin/store-orders'),
+  updateStoreOrderStatus: (id, data) => api.put(`/admin/store-orders/${id}/status`, data),
+  getPlanPayments: () => api.get('/admin/plan-payments'),
+};
+
 // ============ ADMIN: DASHBOARD ============
 export const dashboardAPI = {
   get: () => api.get('/dashboard'),
   trends: () => api.get('/dashboard/trends'),
+  exportReport: () => api.get('/dashboard/export-report'),
 };
 
 export default api;

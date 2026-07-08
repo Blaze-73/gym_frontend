@@ -1,0 +1,52 @@
+/** Fallback if /api/plans fails — keep in sync with PlanCatalog (ids 1–3). */
+export const DEFAULT_PLANS = [
+  {
+    id: 1,
+    name: 'S-TIER PULSE',
+    price: '49',
+    period: 'month',
+    tag: 'Essential',
+    popular: false,
+    features: [
+      '24/7 Unlimited Gym Access',
+      'Build Strength with Guided Workouts',
+      'Track Weekly Progress & Stats',
+      'Standard & Cardio Equipment',
+      'Locker Room & Showers',
+    ],
+  },
+  {
+    id: 2,
+    name: 'INTERSTELLAR',
+    price: '399',
+    period: 'year',
+    tag: 'Most Popular',
+    popular: true,
+    features: [
+      'Everything in Alpha Orbit',
+      'Book Classes & Priority Scheduling',
+      'Request a Personal Coach',
+      'Sauna, Cryotherapy & Recovery Zone',
+      '12 Personal Training Sessions',
+      'VIP Priority Gym Access',
+      '2 Guest Passes / month',
+    ],
+  },
+  {
+    id: 3,
+    name: 'ALPHA ORBIT',
+    price: '129',
+    period: 'month',
+    tag: 'Advanced',
+    popular: false,
+    features: [
+      'Everything in S-Tier Pulse',
+      'Track Nutrition & Macros Daily',
+      'Build Muscle with Custom Programs',
+      '30% Off All Store Orders',
+      'Premium Equipment & Recovery Zone',
+      '3 Guest Passes / month',
+      'Monthly Fitness Assessment',
+    ],
+  },
+];

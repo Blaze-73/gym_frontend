@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Phone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import Logo from '@/components/common/Logo';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     password_confirmation: '',
   });
@@ -33,10 +35,11 @@ const Register = () => {
         await register({
           name: formData.name,
           email: formData.email,
+          phone: formData.phone.trim(),
           password: formData.password,
           password_confirmation: formData.password_confirmation,
         });
-        navigate('/');
+        navigate('/plans', { state: { requireSubscription: true, welcome: true } });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
@@ -64,11 +67,11 @@ const Register = () => {
       >
         {/* LOGO AREA */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <h1 className="text-5xl font-black font-headline text-white tracking-widest italic">
-              ALIEN <span className="text-primary-fixed">FITNESS</span>
-            </h1>
-          </Link>
+          <Logo
+            to="/"
+            size="xl"
+            className="flex-col items-center justify-center gap-4 mx-auto"
+          />
           <div className="h-1 w-12 bg-primary-fixed mx-auto mt-4 rounded-full" />
           <p className="text-gray-400 mt-4 text-xs uppercase tracking-[0.3em] font-bold">
             Initialize Your Evolution
@@ -118,6 +121,24 @@ const Register = () => {
                   placeholder="athlete@alien.com"
                   className="w-full bg-black/40 border border-white/10 rounded-2xl pl-12 pr-4 py-3.5 text-white placeholder:text-gray-600 focus:outline-none focus:border-primary-fixed/50 transition-all"
                   required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Phone Number</label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+212 6XX XXX XXX"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl pl-12 pr-4 py-3.5 text-white placeholder:text-gray-600 focus:outline-none focus:border-primary-fixed/50 transition-all"
+                  required
+                  minLength={6}
+                  maxLength={20}
+                  autoComplete="tel"
                 />
               </div>
             </div>
@@ -174,7 +195,7 @@ const Register = () => {
               disabled={loading}
               className="w-full py-4 bg-primary-fixed text-black font-headline font-black uppercase tracking-widest rounded-2xl hover:bg-primary-fixed/90 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(218,249,0,0.3)]"
             >
-              {loading ? 'Initializing...' : 'Create Account'}
+              {loading ? 'Initializing...' : 'Create Account & Choose Plan'}
             </motion.button>
           </form>
 

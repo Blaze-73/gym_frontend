@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, CheckCheck, Dumbbell, ShoppingBag, Users, AlertCircle, Info, Check, XCircle } from 'lucide-react';
-import { membershipsAPI } from '@/services/api';
+import { Bell, X, CheckCheck, Dumbbell, ShoppingBag, Users, AlertCircle, Info, Check, XCircle, Crown, GraduationCap, Calendar } from 'lucide-react';
+import { membershipsAPI, subscriptionsAPI, notificationsAPI, adminNotificationsAPI } from '@/services/api';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 const NotificationContext = createContext(null);
@@ -12,54 +13,86 @@ export const NotificationProvider = ({ children, isAdmin = false }) => {
   const [loading, setLoading] = useState(true);
 
       const fetchNotifications = async () => {
-    if (!user && !isAdmin) return; 
+    if (!user && !isAdmin) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
       if (isAdmin) {
-        const res = await membershipsAPI.getPending();
-        const pendingMembers = res.data;
-        
-        const mapped = pendingMembers.map(m => ({
-          id: m.id,
-          type: 'user',
-          title: 'Membership Request',
-          body: `${m.user?.name} requested the ${m.plan?.name} plan.`,
-          read: false,
-          time: 'Recent',
-          membershipId: m.id 
-        }));
-        setNotifications(mapped);
+        const res = await adminNotificationsAPI.getAll();
+        const items = res.data?.notifications || [];
+        setNotifications(items);
       } else {
-        // CLIENT LOGIC: Get only MY membership
-        const res = await membershipsAPI.getMe();
-        const myMembership = res.data; // This is now a single object, not an array
+        const items = [];
 
-        if (myMembership && myMembership.status === 'active') {
-          // Create a unique ID for this specific membership activation
-          const notificationId = `activation_${myMembership.id}`;
-          
-          // Check if the user has already seen this activation notification
-          const hasSeen = localStorage.getItem(notificationId);
-
-          if (!hasSeen) {
-            const welcomeNote = {
-              id: notificationId,
-              type: 'info',
-              title: 'Protocol Activated',
-              body: `Welcome to the elite. Your ${myMembership.plan?.name} membership is now ACTIVE.`,
-              read: false,
-              time: 'Just now'
-            };
-
-            setNotifications(prev => [welcomeNote, ...prev]);
-            
-            // Save to localStorage so it doesn't pop up on every page refresh
-            localStorage.setItem(notificationId, 'true');
-          }
-        } else {
-          setNotifications([]);
+        try {
+          const notifRes = await notificationsAPI.getAll();
+          const stored = notifRes.data?.notifications || [];
+          stored.forEach((n) => items.push({ ...n, persisted: true }));
+        } catch (err) {
+          console.error('Failed to load notifications:', err);
         }
+
+        try {
+          const subRes = await subscriptionsAPI.getMe();
+          const sub = subRes.data;
+          const planName = sub?.plan?.name || sub?.plan_name;
+          const hasSubItem = items.some(
+            (i) => i.type === 'subscription' || String(i.title || '').toLowerCase().includes('subscribed')
+          );
+          if (sub && planName && !hasSubItem) {
+            items.unshift({
+              id: `subscribed_${sub.id}`,
+              type: 'subscription',
+              title: `Subscribed to ${planName}`,
+              body: `You're subscribed to ${planName}. Your membership is now active.`,
+              read: false,
+              time: 'Just now',
+              link: '/subscription',
+            });
+          }
+        } catch {
+          // no active subscription
+        }
+
+        try {
+          const alertsRes = await subscriptionsAPI.getAlerts();
+          const alerts = alertsRes.data?.alerts || [];
+          alerts.forEach((a) => {
+            const dismissed = localStorage.getItem(`dismiss_${a.id}`);
+            if (!dismissed) {
+              items.push({ ...a, read: false });
+            }
+          });
+        } catch {
+          // no active subscription alerts
+        }
+
+        try {
+          const res = await membershipsAPI.getMe();
+          const myMembership = res.data;
+          if (myMembership?.status === 'active') {
+            const notificationId = `activation_${myMembership.id}`;
+            if (!localStorage.getItem(notificationId)) {
+              items.push({
+                id: notificationId,
+                type: 'info',
+                title: 'Protocol Activated',
+                body: `Welcome to the elite. Your ${myMembership.plan?.name} membership is now ACTIVE.`,
+                read: false,
+                time: 'Just now',
+              });
+              localStorage.setItem(notificationId, 'true');
+            }
+          }
+        } catch {
+          // no membership
+        }
+
+        setNotifications(items);
       }
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
@@ -86,12 +119,57 @@ export const NotificationProvider = ({ children, isAdmin = false }) => {
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [isAdmin,user]);
+    const onRefresh = () => fetchNotifications();
+    window.addEventListener('notifications:refresh', onRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notifications:refresh', onRefresh);
+    };
+  }, [isAdmin, user]);
 
-  const markRead = (id) => setNotifications(n => n.map(x => x.id === id ? { ...x, read: true } : x));
-  const markAllRead = () => setNotifications(n => n.map(x => ({ ...x, read: true })));
-  const dismiss = (id) => setNotifications(n => n.filter(x => x.id !== id));
+  const markRead = async (id) => {
+    let persisted = false;
+    setNotifications((n) => {
+      const item = n.find((x) => x.id === id);
+      persisted = Boolean(item?.persisted);
+      return n.map((x) => (x.id === id ? { ...x, read: true } : x));
+    });
+    if (persisted) {
+      try {
+        await notificationsAPI.markRead(id);
+      } catch {
+        /* keep local read state */
+      }
+    }
+  };
+
+  const markAllRead = async () => {
+    setNotifications((n) => n.map((x) => ({ ...x, read: true })));
+    try {
+      await notificationsAPI.markAllRead();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const dismiss = async (id) => {
+    if (String(id).startsWith('sub_expiring_')) {
+      localStorage.setItem(`dismiss_${id}`, 'true');
+    }
+    let persisted = false;
+    setNotifications((n) => {
+      const item = n.find((x) => x.id === id);
+      persisted = Boolean(item?.persisted);
+      return n.filter((x) => x.id !== id);
+    });
+    if (persisted) {
+      try {
+        await notificationsAPI.dismiss(id);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -109,13 +187,33 @@ export const useNotifications = () => {
   return ctx;
 };
 
+const linkLabel = (link) => {
+  const labels = {
+    '/subscription': 'View subscription →',
+    '/plans': 'View plans →',
+    '/my-orders': 'View orders →',
+    '/my-coach': 'Open My Coach →',
+    '/coach-portal': 'Open Coach Hub →',
+    '/schedule': 'View schedule →',
+    '/coaches': 'Browse coaches →',
+    '/dashboard': 'Go to dashboard →',
+    '/admin/members': 'Review members →',
+    '/admin/coaches': 'Review coaches →',
+    '/admin/products': 'Manage orders →',
+  };
+  return labels[link] || 'View details →';
+};
+
 const TypeIcon = ({ type }) => {
   const map = {
-    workout: { icon: Dumbbell,      bg: 'bg-primary-fixed/15', color: 'text-primary-fixed' },
-    order:   { icon: ShoppingBag,   bg: 'bg-blue-500/15',      color: 'text-blue-400'      },
-    user:    { icon: Users,         bg: 'bg-purple-500/15',    color: 'text-purple-400'    },
-    alert:   { icon: AlertCircle,   bg: 'bg-error/15',         color: 'text-error'         },
-    info:    { icon: Info,          bg: 'bg-gray-500/15',      color: 'text-gray-400'      },
+    workout: { icon: Dumbbell,        bg: 'bg-primary-fixed/15', color: 'text-primary-fixed' },
+    order:   { icon: ShoppingBag,     bg: 'bg-blue-500/15',      color: 'text-blue-400'      },
+    user:    { icon: Users,           bg: 'bg-purple-500/15',    color: 'text-purple-400'    },
+    coach:   { icon: GraduationCap,   bg: 'bg-amber-500/15',     color: 'text-amber-400'     },
+    schedule:{ icon: Calendar,        bg: 'bg-cyan-500/15',      color: 'text-cyan-400'      },
+    alert:   { icon: AlertCircle,     bg: 'bg-error/15',         color: 'text-error'         },
+    info:    { icon: Info,            bg: 'bg-gray-500/15',      color: 'text-gray-400'      },
+    subscription: { icon: Crown,     bg: 'bg-primary-fixed/15', color: 'text-primary-fixed' },
   };
   const { icon: Icon, bg, color } = map[type] || map.info;
   return (
@@ -200,7 +298,16 @@ const NotificationBell = ({ className = '' }) => {
                         <button onClick={(e) => { e.stopPropagation(); dismiss(n.id); }} className="text-gray-700 hover:text-gray-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.body}</p>
-                      
+                      {n.link && (
+                        <Link
+                          to={n.link}
+                          onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+                          className="inline-block mt-2 text-[10px] font-black uppercase text-primary-fixed hover:underline"
+                        >
+                          {linkLabel(n.link)}
+                        </Link>
+                      )}
+
                       {/* ✅ QUICK ACTIONS FOR ADMIN */}
                       {n.type === 'user' && (
                         <div className="flex gap-2 mt-3">

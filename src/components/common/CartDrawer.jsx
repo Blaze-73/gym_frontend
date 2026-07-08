@@ -1,34 +1,56 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
-import { ordersAPI } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { usePlanEntitlements } from '@/hooks/usePlanEntitlements';
+import { paymentsAPI } from '@/services/api';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import CheckoutForm, { emptyCheckoutForm } from '@/components/common/CheckoutForm';
+import { resolveMediaUrl } from '@/utils/helpers';
 
 const CartDrawer = () => {
   const { cart, isCartOpen, setIsCartOpen, addToCart, decreaseQty, removeFromCart, clearCart } = useCart();
+  const { user } = useAuth();
+  const { storeDiscountPercent, planName } = usePlanEntitlements();
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderDone, setOrderDone] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState(emptyCheckoutForm);
 
-  const total = cart.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  const discountAmount = storeDiscountPercent > 0 ? subtotal * storeDiscountPercent / 100 : 0;
+  const total = Math.max(0, subtotal - discountAmount);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+    if (!showCheckoutForm) {
+      setCheckoutForm(emptyCheckoutForm());
+      setShowCheckoutForm(true);
+      return;
+    }
+    if (!checkoutForm.customer_name?.trim() || !checkoutForm.customer_email?.trim()
+      || !checkoutForm.customer_phone?.trim() || !checkoutForm.customer_address?.trim()) {
+      setCheckoutError('Please fill in all contact fields.');
+      return;
+    }
     setCheckingOut(true);
+    setCheckoutError('');
     try {
-      await ordersAPI.create({
-        items: cart.map(item => ({ product_id: item.id, quantity: item.quantity, price: item.price })),
-        total_amount: total,
+      const res = await paymentsAPI.checkoutStore({
+        items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
+        ...checkoutForm,
       });
-      clearCart();
-      setOrderDone(true);
-      setTimeout(() => { setOrderDone(false); setIsCartOpen(false); }, 2500);
+      const approvalUrl = res.data?.approval_url;
+      if (approvalUrl) {
+        window.location.href = approvalUrl;
+        return;
+      }
+      setCheckoutError('Could not start PayPal checkout.');
     } catch (err) {
-      // Backend may not be ready — still show success UX for demo
-      clearCart();
-      setOrderDone(true);
-      setTimeout(() => { setOrderDone(false); setIsCartOpen(false); }, 2500);
+      setCheckoutError(err.response?.data?.message || 'Checkout failed. Please try again.');
     } finally {
       setCheckingOut(false);
     }
@@ -131,7 +153,7 @@ const CartDrawer = () => {
                     {/* Image */}
                     <div className="w-16 h-16 rounded-lg bg-white/5 flex-shrink-0 overflow-hidden">
                       {item.image
-                        ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        ? <img src={resolveMediaUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">No img</div>
                       }
                     </div>
@@ -178,6 +200,26 @@ const CartDrawer = () => {
             {/* Footer */}
             {cart.length > 0 && (
               <div className="px-6 py-5 border-t border-white/5 space-y-4">
+                {showCheckoutForm && (
+                  <CheckoutForm form={checkoutForm} onChange={setCheckoutForm} />
+                )}
+                {checkoutError && (
+                  <p className="text-xs text-error bg-error/10 border border-error/30 rounded-lg p-3">
+                    {checkoutError}
+                  </p>
+                )}
+                {storeDiscountPercent > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-gray-500">
+                      <span>Subtotal</span>
+                      <span>${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-primary-fixed font-bold">
+                      <span>{planName} — {storeDiscountPercent}% off</span>
+                      <span>-${discountAmount.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 font-headline uppercase text-sm tracking-wider">Total</span>
                   <span className="text-2xl font-black font-headline text-white">
@@ -195,7 +237,7 @@ const CartDrawer = () => {
                 >
                   {checkingOut
                     ? <span className="animate-spin w-4 h-4 border-2 border-black border-t-transparent rounded-full" />
-                    : <><span>Checkout</span><ArrowRight className="w-4 h-4" /></>
+                    : <><span>{showCheckoutForm ? 'Pay with PayPal' : 'Continue to Checkout'}</span><ArrowRight className="w-4 h-4" /></>
                   }
                 </button>
 

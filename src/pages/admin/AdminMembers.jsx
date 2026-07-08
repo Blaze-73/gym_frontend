@@ -8,6 +8,13 @@ import {
 } from 'lucide-react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
+import Select from '@/components/common/Select';
+
+const ROLE_OPTIONS = [
+  { value: 'client', label: 'Client' },
+  { value: 'coach', label: 'Coach' },
+  { value: 'admin', label: 'Admin' },
+];
 
 const AdminMembers = () => {
   const [members, setMembers] = useState([]);
@@ -17,8 +24,19 @@ const AdminMembers = () => {
   
   // Modal States
   const [editUser, setEditUser] = useState(null);
+  const [newUser, setNewUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const emptyNewUser = () => ({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'client',
+  });
 
   useEffect(() => {
     fetchMembers();
@@ -27,7 +45,7 @@ const AdminMembers = () => {
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const response = await usersAPI.getAll();
+      const response = await usersAPI.getAll({ per_page: 100 });
       const data = response.data.data || response.data;
       setMembers(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -59,6 +77,33 @@ const AdminMembers = () => {
       alert('Update failed: ' + (error.response?.data?.message || 'Unknown error'));
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setIsCreating(true);
+    setFormError('');
+    try {
+      await usersAPI.create({
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone || null,
+        password: newUser.password,
+        role: newUser.role,
+      });
+      await fetchMembers();
+      setNewUser(null);
+    } catch (error) {
+      const msg = error.response?.data?.message;
+      const errors = error.response?.data?.errors;
+      if (errors) {
+        setFormError(Object.values(errors).flat().join(' '));
+      } else {
+        setFormError(msg || 'Failed to create user.');
+      }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -100,7 +145,14 @@ const AdminMembers = () => {
             System Administration & Access Control
           </p>
         </div>
-        <Button variant="primary" className="flex items-center gap-2 h-12">
+        <Button
+          variant="primary"
+          className="flex items-center gap-2 h-12"
+          onClick={() => {
+            setFormError('');
+            setNewUser(emptyNewUser());
+          }}
+        >
           <UserPlus className="w-4 h-4" /> Add New User
         </Button>
       </div>
@@ -118,7 +170,7 @@ const AdminMembers = () => {
           />
         </div>
         <div className="flex gap-3 w-full md:w-auto">
-          {['all', 'admin', 'client'].map(role => (
+          {['all', 'admin', 'coach', 'client'].map(role => (
             <button 
               key={role}
               onClick={() => setRoleFilter(role)}
@@ -225,6 +277,78 @@ const AdminMembers = () => {
         })}
       </div>
 
+      {/* ADD USER MODAL */}
+      <Modal isOpen={!!newUser} onClose={() => setNewUser(null)} title="Add New User" size="md">
+        {newUser && (
+          <form onSubmit={handleCreateUser} className="space-y-6 py-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Phone Number</label>
+                <input
+                  type="text"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Password * (min 8 characters)</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">System Role *</label>
+                <Select
+                  value={newUser.role}
+                  onChange={(role) => setNewUser({ ...newUser, role })}
+                  options={ROLE_OPTIONS}
+                />
+                {newUser.role === 'coach' && (
+                  <p className="text-xs text-primary-fixed/80">
+                    Creates a coach account with full platform access (Coach Pass). A coach profile is linked automatically.
+                  </p>
+                )}
+              </div>
+            </div>
+            {formError && (
+              <p className="text-sm text-error bg-error/10 border border-error/30 rounded-xl p-3">{formError}</p>
+            )}
+            <div className="flex gap-3 pt-4">
+              <Button variant="secondary" type="button" onClick={() => setNewUser(null)} className="flex-1">Cancel</Button>
+              <Button type="submit" variant="primary" loading={isCreating} className="flex-1 flex items-center justify-center gap-2">
+                <UserPlus className="w-4 h-4" /> Create User
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       {/* EDIT USER MODAL */}
       <Modal isOpen={!!editUser} onClose={() => setEditUser(null)} title="Update Entity Data" size="md">
         {editUser && (
@@ -254,19 +378,16 @@ const AdminMembers = () => {
                   type="text" 
                   value={editUser.phone || ''} 
                   onChange={e => setEditUser({...editUser, phone: e.target.value})}
-                  className="w-full bg-black border border_white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">System Role</label>
-                <select 
-                  value={editUser.role} 
-                  onChange={e => setEditUser({...editUser, role: e.target.value})}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary-fixed outline-none"
-                >
-                  <option value="client">Client</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <Select
+                  value={editUser.role}
+                  onChange={(role) => setEditUser({ ...editUser, role })}
+                  options={ROLE_OPTIONS}
+                />
               </div>
             </div>
             <div className="flex gap-3 pt-4">

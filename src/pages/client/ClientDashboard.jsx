@@ -4,9 +4,12 @@ import { Dumbbell, Calendar, Utensils, Users, TrendingUp, Activity, Clock, Award
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { userStatsAPI, userProgramsAPI } from '@/services/api';
+import SubscriptionStatusBanner from '@/components/subscription/SubscriptionStatusBanner';
+import { usePlanEntitlements } from '@/hooks/usePlanEntitlements';
 
 const ClientDashboard = () => {
   const { user } = useAuth();
+  const { canNutrition, canSchedule, canCoaches } = usePlanEntitlements();
   const [stats, setStats] = useState({
     workoutsCompleted: 0,
     programsActive: 0,
@@ -55,9 +58,10 @@ const ClientDashboard = () => {
   };
 
   const quickActions = [
-    { title: 'Start Workout', icon: Dumbbell, link: '/workout', color: 'text-primary-fixed' },
-    { title: 'Nutrition', icon: Utensils, link: '/nutrition', color: 'text-green-400' },
-    { title: 'Find Coach', icon: Users, link: '/coaches', color: 'text-purple-400' },
+    { title: 'Start Workout', icon: Dumbbell, link: '/workout', color: 'text-primary-fixed', allowed: true },
+    { title: 'Class Schedule', icon: Calendar, link: '/schedule', color: 'text-blue-400', allowed: canSchedule },
+    { title: 'Nutrition', icon: Utensils, link: '/nutrition', color: 'text-green-400', allowed: canNutrition },
+    { title: 'Find Coach', icon: Users, link: '/coaches', color: 'text-purple-400', allowed: canCoaches },
   ];
 
   if (loading) {
@@ -87,6 +91,8 @@ const ClientDashboard = () => {
       </section>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        <SubscriptionStatusBanner variant="banner" className="mb-8" />
+
         <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
           {[
             { label: 'Workouts Completed', value: stats.workoutsCompleted, icon: Activity, color: 'text-primary-fixed' },
@@ -106,10 +112,17 @@ const ClientDashboard = () => {
           <h2 className="text-2xl font-black font-headline uppercase mb-6">Quick Actions</h2>
           <div className="grid md:grid-cols-4 gap-6">
             {quickActions.map((action, index) => (
-              <Link key={index} to={action.link}>
-                <motion.div whileHover={{ y: -5, scale: 1.02 }} className="bg-surface-container-high border border-white/5 rounded-2xl p-6 cursor-pointer group">
-                  <action.icon className={`w-10 h-10 ${action.color} mb-4 group-hover:scale-110 transition-transform`} />
+              <Link key={index} to={action.allowed ? action.link : '/plans'}>
+                <motion.div
+                  whileHover={{ y: action.allowed ? -5 : 0, scale: action.allowed ? 1.02 : 1 }}
+                  className={`bg-surface-container-high border rounded-2xl p-6 group
+                    ${action.allowed ? 'border-white/5 cursor-pointer' : 'border-white/10 opacity-50 cursor-pointer'}`}
+                >
+                  <action.icon className={`w-10 h-10 ${action.color} mb-4 transition-transform ${action.allowed ? 'group-hover:scale-110' : ''}`} />
                   <h3 className="text-lg font-headline font-bold">{action.title}</h3>
+                  {!action.allowed && (
+                    <p className="text-[10px] text-primary-fixed uppercase mt-2 font-bold">Upgrade plan</p>
+                  )}
                 </motion.div>
               </Link>
             ))}

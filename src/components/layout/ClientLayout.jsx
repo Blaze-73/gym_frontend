@@ -34,8 +34,7 @@ const ClientLayout = () => {
       </header>
 
       <main className="lg:ml-[280px] min-h-screen">
-        {/* Top padding to prevent content hiding under the header */}
-        <div className="pt-16 lg:pt-8 p-4 md:p-6 lg:p-8">
+        <div className="pt-16 lg:pt-20 p-4 md:p-6 lg:p-8 max-w-[1600px]">
           <Outlet />
         </div>
       </main>

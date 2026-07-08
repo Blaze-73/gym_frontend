@@ -10,6 +10,26 @@ import {
   ArrowRight, Flame, Activity
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { siteReviewsAPI } from '@/services/api';
+import SiteReviewForm from '@/components/reviews/SiteReviewForm';
+import Logo from '@/components/common/Logo';
+
+const FALLBACK_TESTIMONIALS = [
+  { id: 'fb-1', name: 'Marcus T.', role: 'Featured story', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80', rating: 5, text: 'Best gym experience ever! The equipment is top-notch and the trainers really care about your progress.', isMemberReview: false },
+  { id: 'fb-2', name: 'James R.', role: 'Featured story', image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&q=80', rating: 5, text: 'Transformed my life completely. Down 40lbs and feeling stronger than I ever have. The community here is incredible.', isMemberReview: false },
+  { id: 'fb-3', name: 'David K.', role: 'Featured story', image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&q=80', rating: 5, text: 'Worth every penny. The 24/7 access fits my schedule perfectly and the facilities are always clean.', isMemberReview: false },
+  { id: 'fb-4', name: 'Sarah M.', role: 'Featured story', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&q=80', rating: 4, text: 'Great equipment and knowledgeable staff. The group classes are my favorite part of the membership.', isMemberReview: false },
+  { id: 'fb-5', name: 'Alex P.', role: 'Featured story', image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&q=80', rating: 5, text: 'The tracking system keeps me accountable. I can see my progress over time which motivates me to keep going.', isMemberReview: false },
+];
+
+/** Real member reviews first; fill carousel with featured stories until we have enough members. */
+const buildDisplayReviews = (memberReviews = []) => {
+  const members = memberReviews.map((r) => ({ ...r, isMemberReview: true }));
+  if (members.length === 0) return FALLBACK_TESTIMONIALS;
+  if (members.length >= FALLBACK_TESTIMONIALS.length) return members;
+  const fillers = FALLBACK_TESTIMONIALS.slice(0, FALLBACK_TESTIMONIALS.length - members.length);
+  return [...members, ...fillers];
+};
 
 const Home = () => {
   const { isAuthenticated, isAdmin } = useAuth();
@@ -17,6 +37,8 @@ const Home = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
+  const [testimonials, setTestimonials] = useState(FALLBACK_TESTIMONIALS);
+  const [reviewStats, setReviewStats] = useState({ average: 4.8, count: 0, fromMembers: false });
   const gymRef = useRef(null);
   const featuresRef = useRef(null);
   const reviewsRef = useRef(null);
@@ -29,12 +51,34 @@ const Home = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const loadSiteReviews = () => {
+    siteReviewsAPI.getAll()
+      .then((res) => {
+        const list = res.data?.reviews || [];
+        const count = res.data?.review_count ?? 0;
+        setTestimonials(buildDisplayReviews(list));
+        setReviewStats({
+          average: count > 0 ? res.data.average_rating : 4.8,
+          count,
+          fromMembers: count > 0,
+        });
+        setCurrentTestimonial(0);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
+    loadSiteReviews();
+  }, []);
+
+  useEffect(() => {
+    const len = testimonials.length;
+    if (len < 2) return undefined;
     const interval = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
+      setCurrentTestimonial((prev) => (prev + 1) % len);
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [testimonials.length]);
 
   const navLinks = [
     { name: 'Plans', href: '/plans' },
@@ -56,13 +100,12 @@ const Home = () => {
     navigate(link.href);
   };
 
-  const testimonials = [
-    { name: 'Marcus T.', role: 'Member since 2022', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80', rating: 5, text: 'Best gym experience ever! The equipment is top-notch and the trainers really care about your progress.' },
-    { name: 'James R.', role: 'Elite Member', image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&q=80', rating: 5, text: 'Transformed my life completely. Down 40lbs and feeling stronger than I ever have. The community here is incredible.' },
-    { name: 'David K.', role: 'Member since 2023', image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&q=80', rating: 5, text: 'Worth every penny. The 24/7 access fits my schedule perfectly and the facilities are always clean.' },
-    { name: 'Sarah M.', role: 'Premium Member', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&q=80', rating: 4, text: 'Great equipment and knowledgeable staff. The group classes are my favorite part of the membership.' },
-    { name: 'Alex P.', role: 'Member since 2021', image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&q=80', rating: 5, text: 'The tracking system keeps me accountable. I can see my progress over time which motivates me to keep going.' },
-  ];
+  const displayAverage = reviewStats.fromMembers
+    ? Number(reviewStats.average).toFixed(1)
+    : '4.8';
+  const displayCountLabel = reviewStats.fromMembers
+    ? `Based on ${reviewStats.count} verified member review${reviewStats.count === 1 ? '' : 's'}`
+    : 'Featured member stories — be the first to review';
 
   const programs = [
     { icon: Heart, title: 'Cardio Training', desc: 'Boost endurance and heart health with high-energy cardio sessions', price: '$29/PLAN', color: 'from-red-500/20 to-red-600/20', iconColor: 'text-red-400' },
@@ -580,9 +623,9 @@ const Home = () => {
           >
             <div className="flex items-center gap-3 mb-4">
               <Star className="w-10 h-10 fill-primary-fixed text-primary-fixed" />
-              <span className="text-6xl sm:text-7xl font-black font-headline text-white tracking-tighter">4.8/5</span>
+              <span className="text-6xl sm:text-7xl font-black font-headline text-white tracking-tighter">{displayAverage}/5</span>
             </div>
-            <p className="text-gray-400 text-lg tracking-wide">Based on 2,784 verified reviews</p>
+            <p className="text-gray-400 text-lg tracking-wide text-center max-w-md">{displayCountLabel}</p>
           </motion.div>
 
           <div className="relative overflow-hidden px-4">
@@ -593,24 +636,32 @@ const Home = () => {
             >
               {[...testimonials, ...testimonials].map((testimonial, i) => (
                 <motion.div
-                  key={i}
+                  key={testimonial.id ? `${testimonial.id}-${i}` : i}
                   className="min-w-[300px] sm:min-w-[400px] bg-zinc-900 border border-white/5 rounded-3xl p-8 flex-shrink-0"
                 >
                   <div className="flex items-center gap-1 mb-6">
-                    {[...Array(testimonial.rating)].map((_, j) => (
+                    {[...Array(Math.min(5, testimonial.rating || 5))].map((_, j) => (
                       <Star key={j} className="w-4 h-4 fill-primary-fixed text-primary-fixed" />
                     ))}
                   </div>
-                  <p className="text-gray-300 mb-8 text-base sm:text-lg leading-relaxed italic">"{testimonial.text}"</p>
+                  <p className="text-gray-300 mb-8 text-base sm:text-lg leading-relaxed italic">&ldquo;{testimonial.text}&rdquo;</p>
                   <div className="flex items-center gap-4">
-                    <img
-                      src={testimonial.image}
-                      alt={testimonial.name}
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-primary-fixed/30"
-                    />
+                    {testimonial.image ? (
+                      <img
+                        src={testimonial.image}
+                        alt={testimonial.name}
+                        className="w-12 h-12 rounded-full object-cover ring-2 ring-primary-fixed/30"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-primary-fixed/15 ring-2 ring-primary-fixed/30 flex items-center justify-center">
+                        <span className="text-sm font-black text-primary-fixed">{testimonial.initial || testimonial.name?.charAt(0)}</span>
+                      </div>
+                    )}
                     <div className="text-left">
                       <p className="text-sm font-headline font-bold text-white">{testimonial.name}</p>
-                      <p className="text-xs text-gray-500 uppercase tracking-widest">{testimonial.role}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-widest">
+                        {testimonial.isMemberReview ? (testimonial.role || 'Verified member') : (testimonial.role || 'Featured story')}
+                      </p>
                     </div>
                   </div>
                 </motion.div>
@@ -629,6 +680,11 @@ const Home = () => {
               ))}
             </div>
           </div>
+
+          <SiteReviewForm
+            isAuthenticated={isAuthenticated}
+            onPosted={() => loadSiteReviews()}
+          />
         </div>
       </section>
 
@@ -668,8 +724,8 @@ const Home = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 mb-16">
             <div className="col-span-2 md:col-span-1">
-              <span className="text-3xl font-black font-headline text-white tracking-tighter">ALIEN</span>
-              <p className="text-gray-500 text-sm mt-4 tracking-wide">Redefine Your Limits.</p>
+              <Logo to="/" text="ALIEN" size="lg" className="mb-4" />
+              <p className="text-gray-500 text-sm tracking-wide">Redefine Your Limits.</p>
             </div>
             <div className="text-left">
               <h4 className="font-headline font-bold mb-6 text-sm uppercase tracking-widest text-white">Quick Links</h4>

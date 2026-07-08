@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Star, Minus, Plus, Check } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import Button from '@/components/common/Button';
+import { resolveMediaUrl } from '@/utils/helpers';
 
 /**
  * ProductDetail
@@ -110,7 +111,7 @@ const ProductDetail = () => {
         >
           {product.image ? (
             <img
-              src={product.image}
+              src={resolveMediaUrl(product.image)}
               alt={product.name}
               className="w-full h-full object-cover"
             />
