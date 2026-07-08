@@ -134,13 +134,6 @@ const Home = () => {
     }
   };
 
-  const stats = [
-    { icon: Flame, value: '850', label: 'Calories' },
-    { icon: Users, value: '2.4K', label: 'Members' },
-    { icon: Activity, value: '150+', label: 'Workouts' },
-    { icon: Award, value: '50+', label: 'Trainers' },
-  ];
-
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
 
@@ -197,18 +190,18 @@ const Home = () => {
                 className="relative w-full h-auto max-w-[1200px] mx-auto object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,1)] z-10"
               />
 
-              {/* Floating Stat Cards - Repositioned & Enlarged Containers */}
+              {/* Floating Stat Cards - Visible on all screen sizes */}
               <motion.div
                 variants={floatVariants}
                 animate="float"
-                className="hidden sm:flex absolute top-[20%] left-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl z-20 items-center gap-4"
+                className="flex absolute top-[10%] sm:top-[20%] left-[3%] sm:left-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-xl sm:rounded-2xl p-2 sm:p-4 shadow-2xl z-20 items-center gap-2 sm:gap-4"
               >
-                <div className="w-12 h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
-                  <Flame className="w-6 h-6 text-primary-fixed" />
+                <div className="w-6 h-6 sm:w-12 sm:h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
+                  <Flame className="w-3 h-3 sm:w-6 sm:h-6 text-primary-fixed" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xl font-black font-headline text-primary-fixed leading-none">850</p>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest">Calories</p>
+                  <p className="text-xs sm:text-xl font-black font-headline text-primary-fixed leading-none">850</p>
+                  <p className="text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-widest">Calories</p>
                 </div>
               </motion.div>
 
@@ -216,14 +209,14 @@ const Home = () => {
                 variants={floatVariants}
                 animate="float"
                 transition={{ delay: 0.5 }}
-                className="hidden sm:flex absolute top-[20%] right-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl z-20 items-center gap-4"
+                className="flex absolute top-[10%] sm:top-[20%] right-[3%] sm:right-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-xl sm:rounded-2xl p-2 sm:p-4 shadow-2xl z-20 items-center gap-2 sm:gap-4"
               >
-                <div className="w-12 h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
-                  <Users className="w-6 h-6 text-primary-fixed" />
+                <div className="w-6 h-6 sm:w-12 sm:h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
+                  <Users className="w-3 h-3 sm:w-6 sm:h-6 text-primary-fixed" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xl font-black font-headline text-primary-fixed leading-none">2.4K</p>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest">Members</p>
+                  <p className="text-xs sm:text-xl font-black font-headline text-primary-fixed leading-none">2.4K</p>
+                  <p className="text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-widest">Members</p>
                 </div>
               </motion.div>
 
@@ -231,14 +224,14 @@ const Home = () => {
                 variants={floatVariants}
                 animate="float"
                 transition={{ delay: 1 }}
-                className="hidden sm:flex absolute bottom-[20%] left-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl z-20 items-center gap-4"
+                className="flex absolute bottom-[10%] sm:bottom-[20%] left-[3%] sm:left-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-xl sm:rounded-2xl p-2 sm:p-4 shadow-2xl z-20 items-center gap-2 sm:gap-4"
               >
-                <div className="w-12 h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
-                  <Activity className="w-6 h-6 text-primary-fixed" />
+                <div className="w-6 h-6 sm:w-12 sm:h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
+                  <Activity className="w-3 h-3 sm:w-6 sm:h-6 text-primary-fixed" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xl font-black font-headline text-primary-fixed leading-none">150+</p>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest">Workouts</p>
+                  <p className="text-xs sm:text-xl font-black font-headline text-primary-fixed leading-none">150+</p>
+                  <p className="text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-widest">Workouts</p>
                 </div>
               </motion.div>
 
@@ -246,36 +239,16 @@ const Home = () => {
                 variants={floatVariants}
                 animate="float"
                 transition={{ delay: 1.5 }}
-                className="hidden sm:flex absolute bottom-[20%] right-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl z-20 items-center gap-4"
+                className="flex absolute bottom-[10%] sm:bottom-[20%] right-[3%] sm:right-[18%] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-xl sm:rounded-2xl p-2 sm:p-4 shadow-2xl z-20 items-center gap-2 sm:gap-4"
               >
-                <div className="w-12 h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
-                  <Award className="w-6 h-6 text-primary-fixed" />
+                <div className="w-6 h-6 sm:w-12 sm:h-12 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
+                  <Award className="w-3 h-3 sm:w-6 sm:h-6 text-primary-fixed" />
                 </div>
                 <div className="text-left">
-                  <p className="text-xl font-black font-headline text-primary-fixed leading-none">50+</p>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest">Trainers</p>
+                  <p className="text-xs sm:text-xl font-black font-headline text-primary-fixed leading-none">50+</p>
+                  <p className="text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-widest">Trainers</p>
                 </div>
               </motion.div>
-            </div>
-
-            <div className="flex sm:hidden justify-center gap-3 mt-8 flex-wrap px-2">
-              {stats.map(({ icon: Icon, value, label }, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 + i * 0.1 }}
-                  className="flex items-center gap-2 bg-black/80 border border-primary-fixed/30 rounded-xl px-3 py-2"
-                >
-                  <div className="w-8 h-8 bg-primary-fixed/20 rounded-full flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4 text-primary-fixed" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-base font-black font-headline text-primary-fixed leading-none">{value}</p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">{label}</p>
-                  </div>
-                </motion.div>
-              ))}
             </div>
           </motion.div>
 

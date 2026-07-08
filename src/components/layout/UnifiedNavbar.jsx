@@ -159,8 +159,8 @@ const UnifiedNavbar = () => {
                   </Link>
                   <Link
                     to="/register"
-                    className="px-3 sm:px-5 py-2 bg-primary-fixed text-on-primary-fixed rounded-full
-                               text-xs sm:text-sm font-headline font-bold uppercase tracking-wider
+                    className="hidden md:inline-flex px-5 py-2 bg-primary-fixed text-on-primary-fixed rounded-full
+                               text-sm font-headline font-bold uppercase tracking-wider
                                hover:scale-105 transition-transform shadow-[0_0_12px_#daf90050]"
                   >
                     Join Now
